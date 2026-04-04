@@ -187,7 +187,7 @@
     }
 
     function updateFinalizeButtonState() {
-        finalizeBtn.disabled = !uploadSessionId || !tosCheck.checked || isFinalizing;
+        finalizeBtn.disabled = !uploadComplete || !tosCheck.checked || isFinalizing;
     }
 
     async function runProtocolInBackground() {
@@ -209,6 +209,7 @@
              
             await startUploadInBackground();
             uploadComplete = true;
+            updateFinalizeButtonState();
             
         } catch (error) {
             console.error('Something failed:', error);
@@ -477,7 +478,7 @@
             stageProcessing.classList.remove('hidden');
             statusText.textContent = 'Completing Upload';
             
-            const maxWaitTime = 60000;  
+            const maxWaitTime = 300000;  
             const startTime = Date.now();
             while (isUploading && !uploadComplete && Date.now() - startTime < maxWaitTime) {
                 await new Promise(resolve => setTimeout(resolve, 500));
@@ -485,6 +486,13 @@
             
             if (uploadError) {
                 showErrorBanner('Upload failed: ' + uploadError);
+                isFinalizing = false;
+                updateFinalizeButtonState();
+                showPendingUI();
+                return;
+            }
+            if (!uploadComplete) {
+                showErrorBanner('Upload is taking longer than expected. Please wait and try again.');
                 isFinalizing = false;
                 updateFinalizeButtonState();
                 showPendingUI();
