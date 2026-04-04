@@ -32,6 +32,8 @@ COPY --from=builder /app/wordlist.txt ./web/static/wordlist.txt
 
 RUN chown -R appuser:appuser /app
 
+RUN mkdir -p /chunks && chown appuser:appuser /chunks
+
 USER appuser
 
 EXPOSE 8085
