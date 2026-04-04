@@ -190,7 +190,7 @@
     }
 
     function updateFinalizeButtonState() {
-        finalizeBtn.disabled = !uploadComplete || !tosCheck.checked || isFinalizing;
+        finalizeBtn.disabled = !tosCheck.checked || isFinalizing;
     }
 
     async function runProtocolInBackground() {
@@ -336,26 +336,42 @@
 
     async function uploadChunksInBackground(initResponse) {
         const totalChunks = initResponse.total_chunks;
+        const MAX_RETRIES = 5;
 
         for (let i = 0; i < totalChunks; i++) {
             const start = i * CHUNK_SIZE;
             const end = Math.min(start + CHUNK_SIZE, encryptedBlob.size);
             const chunk = encryptedBlob.slice(start, end);
 
-            const formData = new FormData();
-            formData.append('session_id', initResponse.session_id);
-            formData.append('chunk_index', i.toString());
-            formData.append('chunk', chunk);
+            let lastError;
+            for (let attempt = 0; attempt < MAX_RETRIES; attempt++) {
+                if (attempt > 0) {
+                    await new Promise(r => setTimeout(r, 2000 * attempt));
+                }
+                try {
+                    const formData = new FormData();
+                    formData.append('session_id', initResponse.session_id);
+                    formData.append('chunk_index', i.toString());
+                    formData.append('chunk', chunk);
 
-            const response = await fetch('/api/upload/chunk', {
-                method: 'POST',
-                body: formData
-            });
+                    const response = await fetch('/api/upload/chunk', {
+                        method: 'POST',
+                        body: formData
+                    });
 
-            if (!response.ok) {
-                const error = await response.json();
-                throw new Error(error.error || `Failed to upload chunk ${i + 1}`);
+                    if (!response.ok) {
+                        const error = await response.json();
+                        throw new Error(error.error || `Failed to upload chunk ${i + 1}`);
+                    }
+                    lastError = null;
+                    break;
+                } catch (error) {
+                    lastError = error;
+                    console.warn(`Chunk ${i} attempt ${attempt + 1} failed:`, error.message);
+                }
             }
+
+            if (lastError) throw lastError;
         }
     }
 
