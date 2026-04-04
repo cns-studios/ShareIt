@@ -5,7 +5,9 @@
     const CHUNK_SIZE = 5 * 1024 * 1024;  
     const MAX_FILE_SIZE = window.CONFIG?.maxFileSize || 786432000;  
 
-     
+    let totalChunks = 0;
+    let uploadedChunks = 0;
+
     let selectedFile = null;
     let encryptedBlob = null;
     let generatedPassword = null;
@@ -181,16 +183,34 @@
     }
 
     function handleFinalize() {
-        console.log('[handleFinalize] isUploading:', isUploading, 'uploadComplete:', uploadComplete, 'uploadSessionId:', uploadSessionId, 'isFinalizing:', isFinalizing, 'tosCheck.checked:', tosCheck.checked);
-            if (!uploadSessionId || isFinalizing || !tosCheck.checked) {
-                return;
+        if (!tosCheck.checked || isFinalizing) return;
+        if (isUploading && !uploadComplete) {
+            stagePending.classList.add('hidden');
+            stageProcessing.classList.remove('hidden');
+            const poll = setInterval(() => {
+                if (uploadComplete) {
+                    clearInterval(poll);
+                    finalizeUpload();
+                } else if (uploadError) {
+                    clearInterval(poll);
+                    showErrorBanner('Upload failed: ' + uploadError);
+                }
+            }, 500);
+            return;
         }
-        console.log('[handleFinalize] Finalizing upload...');
         finalizeUpload();
     }
 
     function updateFinalizeButtonState() {
         finalizeBtn.disabled = !tosCheck.checked || isFinalizing;
+    }
+
+    function updateUploadProgress() {
+        if (totalChunks === 0) return;
+        const pct = Math.floor((uploadedChunks / totalChunks) * 100);
+        progressVal.textContent = `${pct}%`;
+        processSub.textContent = `Chunk ${uploadedChunks} of ${totalChunks}`;
+        processMain.textContent = 'Uploading...';
     }
 
     async function runProtocolInBackground() {
@@ -277,25 +297,23 @@
     }
 
     async function startUploadInBackground() {
-        console.log('[startUploadInBackground] Called');
         if (!encryptedBlob) return;
-        console.log('[startUploadInBackground] encryptedBlob size:', encryptedBlob.size);
-        console.log('[startUploadInBackground] Initializing upload...');
+
         const initResponse = await initUpload();
-        console.log('[startUploadInBackground] initUpload response:', initResponse);
         uploadSessionId = initResponse.session_id;
-        console.log('[startUploadInBackground] Uploading chunks...');
+        totalChunks = initResponse.total_chunks;
+        uploadedChunks = 0;
+
+        stagePending.classList.add('hidden');
+        stageProcessing.classList.remove('hidden');
+
         await uploadChunksInBackground(initResponse);
-        console.log('[startUploadInBackground] Chunks uploaded');
         const completeResponse = await completeUpload();
-        console.log('[startUploadInBackground] completeUpload response:', completeResponse);
         await waitForAssembly(uploadSessionId);
-        console.log('[startUploadInBackground] Assembly complete');
         pendingExpiresAt = completeResponse.pending_expires_at ? new Date(completeResponse.pending_expires_at).getTime() : null;
         statusText.textContent = 'Pending Finalization';
         statusText.style.color = 'var(--accent)';
         startPendingCountdown();
-        console.log('[startUploadInBackground] Pending countdown started');
     }
 
     async function startUpload() {
@@ -335,10 +353,9 @@
     }
 
     async function uploadChunksInBackground(initResponse) {
-        const totalChunks = initResponse.total_chunks;
         const MAX_RETRIES = 5;
 
-        for (let i = 0; i < totalChunks; i++) {
+        for (let i = 0; i < initResponse.total_chunks; i++) {
             const start = i * CHUNK_SIZE;
             const end = Math.min(start + CHUNK_SIZE, encryptedBlob.size);
             const chunk = encryptedBlob.slice(start, end);
@@ -363,6 +380,9 @@
                         const error = await response.json();
                         throw new Error(error.error || `Failed to upload chunk ${i + 1}`);
                     }
+
+                    uploadedChunks++;
+                    updateUploadProgress();
                     lastError = null;
                     break;
                 } catch (error) {
@@ -490,45 +510,12 @@
     async function finalizeUpload() {
         isFinalizing = true;
         updateFinalizeButtonState();
-        
-         
-        if (isUploading && !uploadComplete) {
-            stageEntry.classList.add('hidden');
-            stagePending.classList.add('hidden');
-            stageOutput.classList.add('hidden');
-            stageProcessing.classList.remove('hidden');
-            statusText.textContent = 'Completing Upload';
-            
-            const maxWaitTime = 300000;  
-            const startTime = Date.now();
-            while (isUploading && !uploadComplete && Date.now() - startTime < maxWaitTime) {
-                await new Promise(resolve => setTimeout(resolve, 500));
-            }
-            
-            if (uploadError) {
-                showErrorBanner('Upload failed: ' + uploadError);
-                isFinalizing = false;
-                updateFinalizeButtonState();
-                showPendingUI();
-                return;
-            }
-            if (!uploadComplete) {
-                showErrorBanner('Upload is taking longer than expected. Please wait and try again.');
-                isFinalizing = false;
-                updateFinalizeButtonState();
-                showPendingUI();
-                return;
-            }
-        }
-        
         statusText.textContent = 'Finalizing';
 
         try {
             const response = await fetch('/api/upload/finalize', {
                 method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json'
-                },
+                headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
                     session_id: uploadSessionId,
                     duration: selectedDuration()

@@ -15,12 +15,14 @@ services:
       - POSTGRES_DB=${POSTGRES_DB:-shareit}
       - REDIS_HOST=redis
       - REDIS_PORT=6379
+      - CHUNK_DIR=/tmp/shareit-chunks
       - DATA_DIR=/data
       - BEHIND_CLOUDFLARE=${BEHIND_CLOUDFLARE:-false}
       - MAX_FILE_SIZE=${MAX_FILE_SIZE:-786432000}
       - AUTO_DELETE_REPORT_COUNT=${AUTO_DELETE_REPORT_COUNT:-3}
       - DISCORD_WEBHOOK_URL=${DISCORD_WEBHOOK_URL:-}
     volumes:
+      - /tmp/shareit-chunks:/tmp/shareit-chunks
       - /mnt/shareit:/data
     depends_on:
       postgres:

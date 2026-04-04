@@ -26,7 +26,8 @@ type Config struct {
 	RedisPort string
 
 	 
-	DataDir string
+	DataDir  string
+	ChunkDir string
 
 	 
 	BehindCloudflare bool
@@ -54,6 +55,7 @@ func Load() (*Config, error) {
 		RedisHost:             getEnv("REDIS_HOST", "localhost"),
 		RedisPort:             getEnv("REDIS_PORT", "6379"),
 		DataDir:               getEnv("DATA_DIR", "./data"),
+		ChunkDir:              getEnv("CHUNK_DIR", ""),
 		BehindCloudflare:      getEnvBool("BEHIND_CLOUDFLARE", false),
 		MaxFileSize:           getEnvInt64("MAX_FILE_SIZE", 786432000),  
 		AutoDeleteReportCount: getEnvInt("AUTO_DELETE_REPORT_COUNT", 3),

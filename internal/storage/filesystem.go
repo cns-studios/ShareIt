@@ -19,27 +19,28 @@ type Filesystem struct {
 }
 
 func NewFilesystem(cfg *config.Config) (*Filesystem, error) {
-	dataDir := cfg.DataDir
-	chunkDir := filepath.Join(dataDir, "chunks")
-	finalDir := filepath.Join(dataDir, "files")
+    dataDir := cfg.DataDir
+    
+    chunkDir := cfg.ChunkDir
+    if chunkDir == "" {
+        chunkDir = filepath.Join(dataDir, "chunks")
+    }
+    
+    finalDir := filepath.Join(dataDir, "files")
 
-	 
-	dirs := []string{dataDir, chunkDir, finalDir}
-	for _, dir := range dirs {
-		if err := os.MkdirAll(dir, 0755); err != nil {
-			return nil, fmt.Errorf("failed to create directory %s: %w", dir, err)
-		}
-	}
+    dirs := []string{dataDir, chunkDir, finalDir}
+    for _, dir := range dirs {
+        if err := os.MkdirAll(dir, 0755); err != nil {
+            return nil, fmt.Errorf("failed to create directory %s: %w", dir, err)
+        }
+    }
 
-	return &Filesystem{
-		dataDir:  dataDir,
-		chunkDir: chunkDir,
-		finalDir: finalDir,
-	}, nil
+    return &Filesystem{
+        dataDir:  dataDir,
+        chunkDir: chunkDir,
+        finalDir: finalDir,
+    }, nil
 }
-
- 
-
  
 func (fs *Filesystem) GetChunkDir(sessionID string) string {
 	return filepath.Join(fs.chunkDir, sessionID)
