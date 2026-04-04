@@ -138,22 +138,23 @@
     }
 
     async function processFile(file) {
+        console.log('[processFile] called with file:', file);
         if (isUploading || isFinalizing) {
+            console.log('[processFile] Blocked: isUploading:', isUploading, 'isFinalizing:', isFinalizing);
             return;
         }
-
-         
         if (file.size > MAX_FILE_SIZE) {
+            console.log('[processFile] File too large:', file.size, 'MAX_FILE_SIZE:', MAX_FILE_SIZE);
             showErrorBanner(`File too large. Maximum size is ${SecureCrypto.formatFileSize(MAX_FILE_SIZE)}`);
             return;
         }
-
         if (file.size === 0) {
+            console.log('[processFile] File is empty');
             showErrorBanner('Cannot upload empty file');
             return;
         }
-
         selectedFile = file;
+        console.log('[processFile] File selected:', file.name, 'size:', file.size);
 
          
         fileName.textContent = file.name;
@@ -180,9 +181,11 @@
     }
 
     function handleFinalize() {
-        if (!uploadSessionId || isFinalizing || !tosCheck.checked) {
-            return;
+        console.log('[handleFinalize] isUploading:', isUploading, 'uploadComplete:', uploadComplete, 'uploadSessionId:', uploadSessionId, 'isFinalizing:', isFinalizing, 'tosCheck.checked:', tosCheck.checked);
+            if (!uploadSessionId || isFinalizing || !tosCheck.checked) {
+                return;
         }
+        console.log('[handleFinalize] Finalizing upload...');
         finalizeUpload();
     }
 
@@ -194,25 +197,25 @@
         isUploading = true;
         uploadComplete = false;
         uploadError = null;
-        
+        console.log('[runProtocolInBackground] isUploading set to true');
         try {
-             
+            console.log('[runProtocolInBackground] Generating password...');
             generatedPassword = await SecureCrypto.generatePassword();
-
-             
+            console.log('[runProtocolInBackground] Password generated:', generatedPassword);
+            console.log('[runProtocolInBackground] Encrypting file...');
             encryptedBlob = await SecureCrypto.encryptFile(
                 selectedFile,
                 generatedPassword,
                 () => {}  
             );
-
-             
+            console.log('[runProtocolInBackground] File encrypted, size:', encryptedBlob.size);
+            console.log('[runProtocolInBackground] Starting upload...');
             await startUploadInBackground();
             uploadComplete = true;
+            console.log('[runProtocolInBackground] Upload complete');
             updateFinalizeButtonState();
-            
         } catch (error) {
-            console.error('Something failed:', error);
+            console.error('[runProtocolInBackground] Something failed:', error);
             uploadError = error.message;
             isUploading = false;
             hideErrorBanner();
