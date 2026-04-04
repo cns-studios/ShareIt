@@ -304,7 +304,6 @@
     }
 
     function updateProgress(percent, text) {
-        progressFill.style.width = `${percent}%`;
         if (text) {
             progressText.textContent = text;
         }

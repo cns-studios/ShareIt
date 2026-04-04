@@ -1114,19 +1114,46 @@ footer a:hover {
     padding: 1.5rem;
 }
 
+.progress-title {
+    text-align: center;
+    margin-bottom: 0.75rem;
+    font-size: 0.875rem;
+    color: var(--accent);
+    font-family: 'JetBrains Mono', monospace;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+}
+
 .progress-bar {
     height: 8px;
     background-color: var(--border);
-    border-radius: var(--radius-sm);
+    border-radius: var(--radius-md);
     overflow: hidden;
+}
+
+.progress-bar-indeterminate {
+    position: relative;
 }
 
 .progress-fill {
     height: 100%;
-    background-color: var(--accent);
-    border-radius: var(--radius-sm);
-    transition: width 0.3s ease;
-    width: 0%;
+    width: 35%;
+    min-width: 72px;
+    background: linear-gradient(90deg, rgba(209, 255, 82, 0.12) 0%, var(--accent) 45%, rgba(209, 255, 82, 0.12) 100%);
+    border-radius: var(--radius-md);
+}
+
+.progress-bar-indeterminate .progress-fill {
+    animation: progressIndeterminate 1.2s ease-in-out infinite;
+}
+
+@keyframes progressIndeterminate {
+    0% {
+        transform: translateX(-120%);
+    }
+    100% {
+        transform: translateX(320%);
+    }
 }
 
 .progress-text {
