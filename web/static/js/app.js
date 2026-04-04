@@ -194,6 +194,7 @@
     }
 
     async function runProtocolInBackground() {
+        console.log('[runProtocolInBackground] Starting');
         isUploading = true;
         uploadComplete = false;
         uploadError = null;
@@ -206,14 +207,19 @@
             encryptedBlob = await SecureCrypto.encryptFile(
                 selectedFile,
                 generatedPassword,
-                () => {}  
+                (progress, status) => {
+                    if (progress !== undefined && status) {
+                        console.log(`[runProtocolInBackground] Encryption progress: ${Math.round(progress * 100)}% - ${status}`);
+                    }
+                }
             );
             console.log('[runProtocolInBackground] File encrypted, size:', encryptedBlob.size);
             console.log('[runProtocolInBackground] Starting upload...');
             await startUploadInBackground();
+            console.log('[runProtocolInBackground] Upload finished, marking uploadComplete = true');
             uploadComplete = true;
-            console.log('[runProtocolInBackground] Upload complete');
             updateFinalizeButtonState();
+            console.log('[runProtocolInBackground] Finalize button state updated');
         } catch (error) {
             console.error('[runProtocolInBackground] Something failed:', error);
             uploadError = error.message;
@@ -270,27 +276,28 @@
     }
 
     async function startUploadInBackground() {
+        console.log('[startUploadInBackground] Called');
         if (!encryptedBlob) return;
-
+        console.log('[startUploadInBackground] encryptedBlob size:', encryptedBlob.size);
         try {
-             
+            console.log('[startUploadInBackground] Initializing upload...');
             const initResponse = await initUpload();
+            console.log('[startUploadInBackground] initUpload response:', initResponse);
             uploadSessionId = initResponse.session_id;
-
-             
+            console.log('[startUploadInBackground] Uploading chunks...');
             await uploadChunksInBackground(initResponse);
-
-             
+            console.log('[startUploadInBackground] Chunks uploaded');
             const completeResponse = await completeUpload();
-
+            console.log('[startUploadInBackground] completeUpload response:', completeResponse);
             await waitForAssembly(uploadSessionId);
-             
+            console.log('[startUploadInBackground] Assembly complete');
             pendingExpiresAt = completeResponse.pending_expires_at ? new Date(completeResponse.pending_expires_at).getTime() : null;
             statusText.textContent = 'Pending Finalization';
             statusText.style.color = 'var(--accent)';
             startPendingCountdown();
+            console.log('[startUploadInBackground] Pending countdown started');
         } catch (error) {
-            console.error('Background upload failed:', error);
+            console.error('[startUploadInBackground] Background upload failed:', error);
             uploadError = error.message;
             isUploading = false;
         }
