@@ -44,8 +44,8 @@ func Load() (*Config, error) {
 	_ = godotenv.Load()
 
 	cfg := &Config{
-		Port:                  getEnv("PORT", "8080"),
-		BaseURL:               getEnv("BASE_URL", "http://localhost:8080"),
+		Port:                  getEnv("PORT", "8085"),
+		BaseURL:               getEnv("BASE_URL", "http://localhost:8085"),
 		PostgresHost:          getEnv("POSTGRES_HOST", "localhost"),
 		PostgresPort:          getEnv("POSTGRES_PORT", "5432"),
 		PostgresUser:          getEnv("POSTGRES_USER", "shareit"),
