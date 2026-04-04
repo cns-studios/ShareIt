@@ -1,0 +1,139 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{.title}}</title>
+    <link rel="stylesheet" href="/static/css/style.css">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>🔒 SecureShare</h1>
+            <p class="subtitle">End-to-End Encrypted File Sharing</p>
+        </header>
+
+        <main>
+            <div id="upload-section">
+                <div id="drop-zone" class="drop-zone">
+                    <div class="drop-zone-content">
+                        <span class="drop-icon">📁</span>
+                        <p>Drag & drop a file here</p>
+                        <p class="small">or click to select</p>
+                        <p class="small">Max size: 750 MB</p>
+                    </div>
+                    <input type="file" id="file-input" hidden>
+                </div>
+
+                <div id="file-info" class="hidden">
+                    <div class="file-details">
+                        <span class="file-icon">📄</span>
+                        <div class="file-meta">
+                            <p id="file-name" class="file-name"></p>
+                            <p id="file-size" class="file-size"></p>
+                        </div>
+                        <button id="remove-file" class="btn-icon" title="Remove file">✕</button>
+                    </div>
+                </div>
+
+                <div id="progress-section" class="hidden">
+                    <div class="progress-container">
+                        <div class="progress-bar">
+                            <div id="progress-fill" class="progress-fill"></div>
+                        </div>
+                        <p id="progress-text" class="progress-text">Encrypting...</p>
+                    </div>
+                </div>
+
+                <div id="options-section" class="hidden">
+                    <div class="option-group">
+                        <label for="duration">Share Duration:</label>
+                        <select id="duration">
+                            <option value="24h">24 Hours</option>
+                            <option value="7d" selected>7 Days</option>
+                            <option value="30d">30 Days</option>
+                            <option value="90d">3 Months</option>
+                        </select>
+                    </div>
+
+                    <div class="option-group checkbox-group">
+                        <input type="checkbox" id="agree-tos">
+                        <label for="agree-tos">
+                            I agree to the <a href="/tos" target="_blank">Terms of Service</a> 
+                            and <a href="/privacy" target="_blank">Privacy Policy</a>
+                        </label>
+                    </div>
+
+                    <button id="upload-btn" class="btn btn-primary" disabled>
+                        Upload Encrypted File
+                    </button>
+                </div>
+            </div>
+
+            <div id="result-section" class="hidden">
+                <div class="success-box">
+                    <span class="success-icon">✅</span>
+                    <h2>File Uploaded Successfully!</h2>
+                    
+                    <div class="result-group">
+                        <label>Share Link (copied to clipboard):</label>
+                        <div class="copy-field">
+                            <input type="text" id="share-link" readonly>
+                            <button id="copy-link" class="btn-icon" title="Copy link">📋</button>
+                        </div>
+                    </div>
+
+                    <div class="result-group">
+                        <label>Numeric Code:</label>
+                        <div class="copy-field">
+                            <input type="text" id="numeric-code" readonly>
+                            <button id="copy-code" class="btn-icon" title="Copy code">📋</button>
+                        </div>
+                    </div>
+
+                    <div class="result-group">
+                        <label>Password (5 words):</label>
+                        <div class="copy-field">
+                            <input type="text" id="password-words" readonly>
+                            <button id="copy-password" class="btn-icon" title="Copy password">📋</button>
+                        </div>
+                    </div>
+
+                    <p class="warning">
+                        ⚠️ Save the password! Without it, the file cannot be decrypted.
+                    </p>
+
+                    <button id="upload-another" class="btn btn-secondary">
+                        Upload Another File
+                    </button>
+                </div>
+            </div>
+
+            <div id="error-section" class="hidden">
+                <div class="error-box">
+                    <span class="error-icon">❌</span>
+                    <h2>Upload Failed</h2>
+                    <p id="error-message"></p>
+                    <button id="try-again" class="btn btn-secondary">
+                        Try Again
+                    </button>
+                </div>
+            </div>
+        </main>
+
+        <footer>
+            <p>Files are encrypted in your browser before upload.</p>
+            <p>We never see your encryption keys.</p>
+        </footer>
+    </div>
+
+    <script>
+        window.CONFIG = {
+            baseURL: "{{.baseURL}}",
+            maxFileSize: {{.maxFileSize}}
+        };
+    </script>
+    <script src="/static/js/crypto.js"></script>
+    <script src="/static/js/app.js"></script>
+</body>
+</html>

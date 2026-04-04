@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{.title}}</title>
+    <link rel="stylesheet" href="/static/css/style.css">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <a href="/" class="logo-link">
+                <h1>🔒 SecureShare</h1>
+            </a>
+            <p class="subtitle">End-to-End Encrypted File Sharing</p>
+        </header>
+
+        <main>
+            <div id="lookup-section">
+                <div class="lookup-box">
+                    <h2>Retrieve a File</h2>
+                    <p>Enter the 12-digit numeric code to find your file.</p>
+
+                    <div class="input-group">
+                        <label for="code-input">Numeric Code:</label>
+                        <input 
+                            type="text" 
+                            id="code-input" 
+                            placeholder="000000000000"
+                            maxlength="12"
+                            pattern="[0-9]*"
+                            inputmode="numeric"
+                            autocomplete="off"
+                        >
+                        <p class="hint">12 digits, no spaces or dashes</p>
+                    </div>
+
+                    <button id="lookup-btn" class="btn btn-primary">
+                        🔍 Find File
+                    </button>
+                </div>
+            </div>
+
+            <div id="loading-section" class="hidden">
+                <div class="loading-box">
+                    <div class="spinner"></div>
+                    <p>Looking up file...</p>
+                </div>
+            </div>
+
+            <div id="result-section" class="hidden">
+                <div class="file-info-box">
+                    <h2>📄 <span id="file-name"></span></h2>
+                    <div class="file-meta-grid">
+                        <div class="meta-item">
+                            <span class="meta-label">Size:</span>
+                            <span id="file-size" class="meta-value"></span>
+                        </div>
+                        <div class="meta-item">
+                            <span class="meta-label">Uploaded:</span>
+                            <span id="file-created" class="meta-value"></span>
+                        </div>
+                        <div class="meta-item">
+                            <span class="meta-label">Expires:</span>
+                            <span id="file-expires" class="meta-value"></span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="password-box">
+                    <div class="input-group">
+                        <label for="password-input">Enter Password (5 words):</label>
+                        <input type="text" id="password-input" placeholder="e.g., apple-banana-cherry-date-elder">
+                        <p class="hint">Words separated by hyphens</p>
+                    </div>
+                    <button id="download-btn" class="btn btn-primary btn-large">
+                        🔓 Download & Decrypt
+                    </button>
+                </div>
+
+                <div id="progress-section" class="hidden">
+                    <div class="progress-container">
+                        <div class="progress-bar">
+                            <div id="progress-fill" class="progress-fill"></div>
+                        </div>
+                        <p id="progress-text" class="progress-text">Downloading...</p>
+                    </div>
+                </div>
+
+                <button id="search-another" class="btn btn-secondary">
+                    Search Another Code
+                </button>
+            </div>
+
+            <div id="success-section" class="hidden">
+                <div class="success-box">
+                    <span class="success-icon">✅</span>
+                    <h2>File Decrypted Successfully!</h2>
+                    <p>Your download should start automatically.</p>
+                    <div class="success-actions">
+                        <button id="download-again-btn" class="btn btn-secondary">
+                            Download Again
+                        </button>
+                        <button id="search-new-btn" class="btn btn-primary">
+                            Search Another Code
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <div id="error-section" class="hidden">
+                <div class="error-box">
+                    <span class="error-icon">❌</span>
+                    <h2 id="error-title">Error</h2>
+                    <p id="error-message"></p>
+                    <button id="try-again-btn" class="btn btn-secondary">
+                        Try Again
+                    </button>
+                </div>
+            </div>
+        </main>
+
+        <footer>
+            <p>Files are decrypted in your browser.</p>
+            <p>We never see your encryption keys.</p>
+        </footer>
+    </div>
+
+    <script>
+        window.CONFIG = {
+            baseURL: "{{.baseURL}}"
+        };
+    </script>
+    <script src="/static/js/crypto.js"></script>
+    <script src="/static/js/lookup.js"></script>
+</body>
+</html>

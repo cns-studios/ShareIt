@@ -1,0 +1,75 @@
+version: '3.8'
+
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "8080:8080"
+    environment:
+      - PORT=8080
+      - BASE_URL=${BASE_URL:-http://localhost:8080}
+      - POSTGRES_HOST=postgres
+      - POSTGRES_PORT=5432
+      - POSTGRES_USER=${POSTGRES_USER:-secureshare}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-secureshare}
+      - POSTGRES_DB=${POSTGRES_DB:-secureshare}
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - DATA_DIR=/data
+      - BEHIND_CLOUDFLARE=${BEHIND_CLOUDFLARE:-false}
+      - MAX_FILE_SIZE=${MAX_FILE_SIZE:-786432000}
+      - AUTO_DELETE_REPORT_COUNT=${AUTO_DELETE_REPORT_COUNT:-3}
+      - DISCORD_WEBHOOK_URL=${DISCORD_WEBHOOK_URL:-}
+    volumes:
+      - file_data:/data
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
+    networks:
+      - secureshare
+
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      - POSTGRES_USER=${POSTGRES_USER:-secureshare}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-secureshare}
+      - POSTGRES_DB=${POSTGRES_DB:-secureshare}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-secureshare} -d ${POSTGRES_DB:-secureshare}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+    networks:
+      - secureshare
+
+  redis:
+    image: redis:7-alpine
+    command: redis-server --appendonly yes
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+    networks:
+      - secureshare
+
+volumes:
+  file_data:
+  postgres_data:
+  redis_data:
+
+networks:
+  secureshare:
+    driver: bridge
