@@ -1136,11 +1136,13 @@ footer a:hover {
 }
 
 .progress-fill {
+    display: block;
     height: 100%;
     width: 35%;
     min-width: 72px;
     background: linear-gradient(90deg, rgba(209, 255, 82, 0.12) 0%, var(--accent) 45%, rgba(209, 255, 82, 0.12) 100%);
     border-radius: var(--radius-md);
+    will-change: transform;
 }
 
 .progress-bar-indeterminate .progress-fill {
@@ -1161,6 +1163,10 @@ footer a:hover {
     margin-top: 0.75rem;
     font-size: 0.9rem;
     color: #555;
+}
+
+.progress-bar-indeterminate + .progress-text {
+    margin-top: 0.65rem;
 }
 
  
