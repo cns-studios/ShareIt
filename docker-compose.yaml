@@ -21,7 +21,7 @@ services:
       - AUTO_DELETE_REPORT_COUNT=${AUTO_DELETE_REPORT_COUNT:-3}
       - DISCORD_WEBHOOK_URL=${DISCORD_WEBHOOK_URL:-}
     volumes:
-      - file_data:/data
+      - /mnt/shareit:/data
     depends_on:
       postgres:
         condition: service_healthy
