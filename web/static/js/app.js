@@ -219,6 +219,20 @@
         }
     }
 
+    async function waitForAssembly(sessionId, intervalMs = 1500, timeoutMs = 600000) {
+        const deadline = Date.now() + timeoutMs;
+        while (Date.now() < deadline) {
+            const res = await fetch(`/api/upload/status/${sessionId}`);
+            if (!res.ok) throw new Error('Failed to check assembly status');
+            const { status } = await res.json();
+            if (status === 'done') return;
+            if (status.startsWith('error:')) throw new Error(status.slice(6));
+            statusText.textContent = 'Assembling...';
+            await new Promise(r => setTimeout(r, intervalMs));
+        }
+        throw new Error('Assembly timed out');
+    }
+
     async function runProtocol() {
         stageEntry.classList.add('hidden');
         stagePending.classList.add('hidden');
@@ -264,6 +278,8 @@
 
              
             const completeResponse = await completeUpload();
+
+            await waitForAssembly(uploadSessionId);
              
             pendingExpiresAt = completeResponse.pending_expires_at ? new Date(completeResponse.pending_expires_at).getTime() : null;
             statusText.textContent = 'Pending Finalization';
@@ -335,30 +351,6 @@
                 throw new Error(error.error || `Failed to upload chunk ${i + 1}`);
             }
         }
-    }
-
-    async function initUpload() {
-        const totalChunks = Math.ceil(encryptedBlob.size / CHUNK_SIZE);
-
-        const response = await fetch('/api/upload/init', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({
-                file_name: selectedFile.name,
-                file_size: encryptedBlob.size,
-                total_chunks: totalChunks,
-                chunk_size: CHUNK_SIZE
-            })
-        });
-
-        if (!response.ok) {
-            const error = await response.json();
-            throw new Error(error.error || 'Failed to initialize upload');
-        }
-
-        return response.json();
     }
 
     async function initUpload() {
@@ -674,6 +666,7 @@
         selectedFile = null;
         encryptedBlob = null;
         generatedPassword = null;
+        const sessionToCancel = uploadSessionId;
         uploadSessionId = null;
         pendingExpiresAt = null;
         isFinalizing = false;
@@ -682,8 +675,12 @@
         uploadError = null;
 
          
-        if (uploadSessionId) {
-            cancelUpload();
+        if (sessionToCancel) {
+            fetch('/api/upload/cancel', {
+                method: 'DELETE',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ session_id: sessionToCancel })
+            }).catch(e => console.error('Failed to cancel upload:', e));
         }
 
          

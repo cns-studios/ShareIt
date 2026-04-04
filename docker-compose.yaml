@@ -3,6 +3,12 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.middlewares.shareit-timeout.forwardingTimeouts.responseHeaderTimeout=15m"
+      - "traefik.http.middlewares.shareit-timeout.forwardingTimeouts.dialTimeout=30s"
+      - "traefik.http.middlewares.shareit-timeout.forwardingTimeouts.idleConnTimeout=15m"
+      - "traefik.http.routers.shareit.middlewares=shareit-timeout"
     ports:
       - "8085:8085"
     environment:

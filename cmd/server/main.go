@@ -115,6 +115,7 @@ func main() {
             upload.POST("/init", rateLimiter.Handler(), uploadHandler.Init)
             upload.POST("/chunk", uploadHandler.Chunk)
             upload.POST("/complete", uploadHandler.Complete)
+			upload.GET("/status/:session_id", uploadHandler.AssemblyStatus)
 			upload.POST("/finalize", uploadHandler.Finalize)
             upload.DELETE("/cancel", uploadHandler.Cancel)
         }
@@ -133,9 +134,10 @@ func main() {
 	srv := &http.Server{
 		Addr:         ":" + cfg.Port,
 		Handler:      router,
-		ReadTimeout:  5 * time.Minute,
-		WriteTimeout: 5 * time.Minute,
-		IdleTimeout:  60 * time.Second,
+		ReadHeaderTimeout: 30 * time.Second,
+		ReadTimeout:       0,
+		WriteTimeout:      0,
+		IdleTimeout:       120 * time.Second,
 	}
 
 	 

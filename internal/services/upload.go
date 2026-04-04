@@ -206,7 +206,6 @@ func (u *Upload) CompleteUpload(ctx context.Context, sessionID string) (*models.
 		return nil, err
 	}
 
-	 
 	uploadedCount, err := u.redis.GetUploadedChunkCount(ctx, sessionID)
 	if err != nil {
 		return nil, err
@@ -217,19 +216,29 @@ func (u *Upload) CompleteUpload(ctx context.Context, sessionID string) (*models.
 	}
 
 	 
-	if err := u.fs.AssembleChunks(sessionID, session.FileID, session.TotalChunks); err != nil {
-		return nil, fmt.Errorf("error assembling chunks: %w", err)
-	}
-
-	 
 	pendingTTL := u.redis.PendingTTL()
 	if err := u.redis.MarkFilePending(ctx, session.FileID, sessionID); err != nil {
-		u.fs.DeleteFile(session.FileID)
 		return nil, fmt.Errorf("error marking file as pending: %w", err)
 	}
 	if err := u.redis.SetUploadSessionTTL(ctx, sessionID, pendingTTL); err != nil {
 		log.Printf("Warning: failed to shrink session TTL for pending upload %s: %v", sessionID, err)
 	}
+
+	if err := u.redis.SetAssemblyStatus(ctx, sessionID, "pending"); err != nil {
+		return nil, fmt.Errorf("error setting assembly status: %w", err)
+	}
+
+	go func() {
+		bgCtx := context.Background()
+		if err := u.fs.AssembleChunks(sessionID, session.FileID, session.TotalChunks); err != nil {
+			log.Printf("Error assembling chunks for session %s: %v", sessionID, err)
+			u.redis.SetAssemblyStatus(bgCtx, sessionID, "error:"+err.Error())
+			u.redis.RemovePendingFile(bgCtx, session.FileID)
+			return
+		}
+		u.redis.SetAssemblyStatus(bgCtx, sessionID, "done")
+		log.Printf("Assembly complete for session %s file %s", sessionID, session.FileID)
+	}()
 
 	 
 	u.redis.DeleteChunkTracking(ctx, sessionID)
@@ -241,6 +250,10 @@ func (u *Upload) CompleteUpload(ctx context.Context, sessionID string) (*models.
 	}, nil
 }
 
+func (u *Upload) GetAssemblyStatus(ctx context.Context, sessionID string) (string, error) {
+	return u.redis.GetAssemblyStatus(ctx, sessionID)
+}
+
  
 func (u *Upload) FinalizeUpload(ctx context.Context, sessionID, duration string) (*models.UploadFinalizeResponse, error) {
 	session, err := u.redis.GetUploadSession(ctx, sessionID)
@@ -250,8 +263,8 @@ func (u *Upload) FinalizeUpload(ctx context.Context, sessionID, duration string)
 		}
 		return nil, err
 	}
-
-	isPending, err := u.redis.IsFilePending(ctx, session.FileID)
+	var isPending bool
+	isPending, err = u.redis.IsFilePending(ctx, session.FileID)
 	if err != nil {
 		return nil, err
 	}
@@ -259,7 +272,8 @@ func (u *Upload) FinalizeUpload(ctx context.Context, sessionID, duration string)
 		return nil, models.ErrUploadNotPending
 	}
 
-	dur, err := models.ParseFinalizeDuration(duration)
+    var dur time.Duration
+    dur, err = models.ParseFinalizeDuration(duration)
 	if err != nil {
 		return nil, err
 	}

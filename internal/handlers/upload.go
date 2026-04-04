@@ -81,7 +81,38 @@ func (h *UploadHandler) Init(c *gin.Context) {
 	c.JSON(http.StatusOK, resp)
 }
 
- 
+func (h *UploadHandler) AssemblyStatus(c *gin.Context) {
+	sessionID := c.Param("session_id")
+	if sessionID == "" {
+		c.JSON(http.StatusBadRequest, models.ErrorResponse{
+			Error: "Missing session_id",
+			Code:  "MISSING_SESSION_ID",
+		})
+		return
+	}
+
+	status, err := h.uploadService.GetAssemblyStatus(c.Request.Context(), sessionID)
+	if err != nil {
+		if err == models.ErrSessionNotFound {
+			c.JSON(http.StatusNotFound, models.ErrorResponse{
+				Error: "Assembly status not found",
+				Code:  "SESSION_NOT_FOUND",
+			})
+			return
+		}
+		c.JSON(http.StatusInternalServerError, models.ErrorResponse{
+			Error: "Failed to get assembly status",
+			Code:  "STATUS_ERROR",
+		})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"session_id": sessionID,
+		"status":     status,
+	})
+}
+
 func (h *UploadHandler) Finalize(c *gin.Context) {
 	var req models.UploadFinalizeRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
