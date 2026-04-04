@@ -4,6 +4,8 @@
      
     const CHUNK_SIZE = 5 * 1024 * 1024;  
     const MAX_FILE_SIZE = window.CONFIG?.maxFileSize || 786432000;  
+    const PARALLEL_CHUNK_UPLOADS = window.CONFIG?.parallelChunkUploads || 4;
+    const MAX_CHUNK_UPLOAD_RETRIES = 5;
 
     let totalChunks = 0;
     let uploadedChunks = 0;
@@ -354,46 +356,77 @@
     }
 
     async function uploadChunksInBackground(initResponse) {
-        const MAX_RETRIES = 5;
+        uploadedChunks = 0;
+        await uploadChunksParallel(initResponse, () => {
+            uploadedChunks++;
+            updateUploadProgress();
+        });
+    }
 
-        for (let i = 0; i < initResponse.total_chunks; i++) {
-            const start = i * CHUNK_SIZE;
-            const end = Math.min(start + CHUNK_SIZE, encryptedBlob.size);
-            const chunk = encryptedBlob.slice(start, end);
+    function getChunkBlob(chunkIndex) {
+        const start = chunkIndex * CHUNK_SIZE;
+        const end = Math.min(start + CHUNK_SIZE, encryptedBlob.size);
+        return encryptedBlob.slice(start, end);
+    }
 
-            let lastError;
-            for (let attempt = 0; attempt < MAX_RETRIES; attempt++) {
-                if (attempt > 0) {
-                    await new Promise(r => setTimeout(r, 2000 * attempt));
-                }
-                try {
-                    const formData = new FormData();
-                    formData.append('session_id', initResponse.session_id);
-                    formData.append('chunk_index', i.toString());
-                    formData.append('chunk', chunk);
+    async function uploadChunkWithRetry(sessionId, chunkIndex) {
+        const chunk = getChunkBlob(chunkIndex);
+        let lastError;
 
-                    const response = await fetch('/api/upload/chunk', {
-                        method: 'POST',
-                        body: formData
-                    });
-
-                    if (!response.ok) {
-                        const error = await response.json();
-                        throw new Error(error.error || `Failed to upload chunk ${i + 1}`);
-                    }
-
-                    uploadedChunks++;
-                    updateUploadProgress();
-                    lastError = null;
-                    break;
-                } catch (error) {
-                    lastError = error;
-                    console.warn(`Chunk ${i} attempt ${attempt + 1} failed:`, error.message);
-                }
+        for (let attempt = 0; attempt < MAX_CHUNK_UPLOAD_RETRIES; attempt++) {
+            if (attempt > 0) {
+                await new Promise(r => setTimeout(r, 2000 * attempt));
             }
 
-            if (lastError) throw lastError;
+            try {
+                const formData = new FormData();
+                formData.append('session_id', sessionId);
+                formData.append('chunk_index', chunkIndex.toString());
+                formData.append('chunk', chunk);
+
+                const response = await fetch('/api/upload/chunk', {
+                    method: 'POST',
+                    body: formData
+                });
+
+                if (!response.ok) {
+                    const error = await response.json();
+                    throw new Error(error.error || `Failed to upload chunk ${chunkIndex + 1}`);
+                }
+
+                return;
+            } catch (error) {
+                lastError = error;
+                console.warn(`Chunk ${chunkIndex} attempt ${attempt + 1} failed:`, error.message);
+            }
         }
+
+        throw lastError;
+    }
+
+    async function uploadChunksParallel(initResponse, onChunkUploaded) {
+        const totalChunks = initResponse.total_chunks;
+        const concurrency = Math.max(1, Math.min(PARALLEL_CHUNK_UPLOADS, totalChunks));
+        let nextChunkIndex = 0;
+
+        const worker = async () => {
+            while (true) {
+                const chunkIndex = nextChunkIndex;
+                nextChunkIndex++;
+
+                if (chunkIndex >= totalChunks) {
+                    return;
+                }
+
+                await uploadChunkWithRetry(initResponse.session_id, chunkIndex);
+                if (onChunkUploaded) {
+                    onChunkUploaded(chunkIndex, totalChunks);
+                }
+            }
+        };
+
+        const workers = Array.from({ length: concurrency }, () => worker());
+        await Promise.all(workers);
     }
 
     async function initUpload() {
@@ -422,32 +455,13 @@
 
     async function uploadChunks(initResponse) {
         const totalChunks = initResponse.total_chunks;
-        let uploadedChunks = 0;
+        let uploadedCount = 0;
 
-        for (let i = 0; i < totalChunks; i++) {
-            const start = i * CHUNK_SIZE;
-            const end = Math.min(start + CHUNK_SIZE, encryptedBlob.size);
-            const chunk = encryptedBlob.slice(start, end);
-
-            const formData = new FormData();
-            formData.append('session_id', initResponse.session_id);
-            formData.append('chunk_index', i.toString());
-            formData.append('chunk', chunk);
-
-            const response = await fetch('/api/upload/chunk', {
-                method: 'POST',
-                body: formData
-            });
-
-            if (!response.ok) {
-                const error = await response.json();
-                throw new Error(error.error || `Failed to upload ${i + 1}`);
-            }
-
-            uploadedChunks++;
-            const progress = 50 + (uploadedChunks / totalChunks) * 45;
+        await uploadChunksParallel(initResponse, () => {
+            uploadedCount++;
+            const progress = 50 + (uploadedCount / totalChunks) * 45;
             updateProgress(progress, `Sending it high to the clouds`, 'Uploading...');
-        }
+        });
     }
 
     async function completeUpload() {
