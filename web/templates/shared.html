@@ -5,119 +5,134 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{{.title}}</title>
     <link rel="stylesheet" href="/static/css/style.css">
+    <script src="https://unpkg.com/lucide@latest"></script>
 </head>
 <body>
+    <div class="grid-line v-line" style="left: 10%;"></div>
+    <div class="grid-line v-line" style="left: 90%;"></div>
+    <div class="grid-line h-line" style="top: 15%;"></div>
+
     <div class="container">
         <header>
-            <a href="/" class="logo-link">
-                <h1>🔒 SecureShare</h1>
-            </a>
-            <p class="subtitle">End-to-End Encrypted File Sharing</p>
+            <div class="space-y-1">
+                <h1><a href="/" style="text-decoration: none; color: inherit;">ShareIt</a></h1>
+                <p class="subtitle">End-to-End Encrypted File Sharing</p>
+            </div>
         </header>
 
-        <main>
-            <div id="loading-section">
-                <div class="loading-box">
-                    <div class="spinner"></div>
-                    <p>Loading file information...</p>
-                </div>
-            </div>
-
-            <div id="password-section" class="hidden">
-                <div class="file-info-box">
-                    <h2>📄 <span id="file-name"></span></h2>
-                    <div class="file-meta-grid">
-                        <div class="meta-item">
-                            <span class="meta-label">Size:</span>
-                            <span id="file-size" class="meta-value"></span>
-                        </div>
-                        <div class="meta-item">
-                            <span class="meta-label">Uploaded:</span>
-                            <span id="file-created" class="meta-value"></span>
-                        </div>
-                        <div class="meta-item">
-                            <span class="meta-label">Expires:</span>
-                            <span id="file-expires" class="meta-value"></span>
-                        </div>
+        <main style="display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 3rem 1.5rem; max-width: 100%;">
+            <div style="max-width: 600px; width: 100%;">
+                <div id="loading-section">
+                    <div class="loading-box">
+                        <div class="spinner"></div>
+                        <p>Loading file information...</p>
                     </div>
                 </div>
 
-                <div id="auto-decrypt-section" class="hidden">
-                    <p class="info-text">Password detected in URL. Click to download and decrypt.</p>
-                    <button id="download-auto-btn" class="btn btn-primary btn-large">
-                        🔓 Download & Decrypt
-                    </button>
-                </div>
-
-                <div id="manual-decrypt-section">
-                    <div class="input-group">
-                        <label for="password-input">Enter Password (5 words):</label>
-                        <input type="text" id="password-input" placeholder="e.g., apple-banana-cherry-date-elder">
-                        <p class="hint">Words separated by hyphens</p>
-                    </div>
-                    <button id="download-manual-btn" class="btn btn-primary btn-large">
-                        🔓 Download & Decrypt
-                    </button>
-                </div>
-
-                <div id="progress-section" class="hidden">
-                    <div class="progress-container">
-                        <div class="progress-bar">
-                            <div id="progress-fill" class="progress-fill"></div>
+                <div id="password-section" class="hidden">
+                    <div class="file-info-box">
+                        <h2 style="display: flex; align-items: center; gap: 0.5rem;">
+                            <i data-lucide="file" style="width: 1.5rem; height: 1.5rem;"></i>
+                            <span id="file-name"></span>
+                        </h2>
+                        <div class="file-meta-grid">
+                            <div class="meta-item">
+                                <span class="meta-label">Size:</span>
+                                <span id="file-size" class="meta-value"></span>
+                            </div>
+                            <div class="meta-item">
+                                <span class="meta-label">Uploaded:</span>
+                                <span id="file-created" class="meta-value"></span>
+                            </div>
+                            <div class="meta-item">
+                                <span class="meta-label">Expires:</span>
+                                <span id="file-expires" class="meta-value"></span>
+                            </div>
                         </div>
-                        <p id="progress-text" class="progress-text">Downloading...</p>
                     </div>
-                </div>
-            </div>
 
-            <div id="success-section" class="hidden">
-                <div class="success-box">
-                    <span class="success-icon">✅</span>
-                    <h2>File Decrypted Successfully!</h2>
-                    <p>Your download should start automatically.</p>
-                    <button id="download-again-btn" class="btn btn-secondary">
-                        Download Again
-                    </button>
-                </div>
-            </div>
-
-            <div id="error-section" class="hidden">
-                <div class="error-box">
-                    <span class="error-icon">❌</span>
-                    <h2 id="error-title">Error</h2>
-                    <p id="error-message"></p>
-                    <div id="error-actions">
-                        <button id="retry-btn" class="btn btn-secondary hidden">
-                            Try Again
+                    <div id="auto-decrypt-section" class="hidden">
+                        <p class="info-text" style="color: var(--accent); text-transform: uppercase; font-size: 0.875rem; margin-bottom: 1.5rem;">Passcode detected in URL</p>
+                        <button id="download-auto-btn" class="btn btn-accent btn-large">
+                            <i data-lucide="download"></i> Download
                         </button>
-                        <a href="/" class="btn btn-primary">
-                            Upload a File
-                        </a>
+                    </div>
+
+                    <div id="manual-decrypt-section">
+                        <div class="password-box">
+                            <div class="input-group">
+                                <label for="password-input">Enter Passcode (5 words):</label>
+                                <input type="text" id="password-input" placeholder="e.g., apple-banana-cherry-date-elder" style="width: 100%; padding: 0.75rem; font-family: 'JetBrains Mono', monospace; background: #0d0d0d; border: 1px solid var(--border); color: var(--accent); border-radius: 2px;">
+                                <p class="hint">Words separated by hyphens</p>
+                            </div>
+                            <button id="download-manual-btn" class="btn btn-accent btn-large">
+                                <i data-lucide="download"></i> Download
+                            </button>
+                        </div>
+                    </div>
+
+                    <div id="progress-section" class="hidden">
+                        <div class="progress-container">
+                            <div class="progress-bar">
+                                <div id="progress-fill" class="progress-fill"></div>
+                            </div>
+                            <p id="progress-text" class="progress-text">Downloading...</p>
+                        </div>
                     </div>
                 </div>
-            </div>
 
-            <div class="report-section">
-                <button id="report-btn" class="btn btn-text">
-                    🚩 Report this file
-                </button>
-            </div>
+                <div id="success-section" class="hidden">
+                    <div class="success-box">
+                        <div style="font-size: 3rem; margin-bottom: 1rem;">
+                            <i data-lucide="check-circle"></i>
+                        </div>
+                        <h2>File received Successfully!</h2>
+                        <p style="color: #555; margin-bottom: 1.5rem;">Your download should start automatically.</p>
+                        <button id="download-again-btn" class="btn btn-secondary btn-large">
+                            Download Again
+                        </button>
+                    </div>
+                </div>
 
-            <div id="report-modal" class="modal hidden">
-                <div class="modal-content">
-                    <h3>Report File</h3>
-                    <p>Are you sure you want to report this file for violating our terms of service?</p>
-                    <div class="modal-actions">
-                        <button id="report-cancel" class="btn btn-secondary">Cancel</button>
-                        <button id="report-confirm" class="btn btn-danger">Report</button>
+                <div id="error-section" class="hidden">
+                    <div class="error-box">
+                        <div style="font-size: 3rem; margin-bottom: 1rem;">
+                            <i data-lucide="x-circle"></i>
+                        </div>
+                        <h2 id="error-title">Error</h2>
+                        <p id="error-message" style="color: #555; margin-bottom: 1.5rem;"></p>
+                        <div style="display: flex; flex-direction: column; gap: 1rem;">
+                            <button id="retry-btn" class="btn btn-secondary btn-large hidden">
+                                Try Again
+                            </button>
+                            <a href="/" class="btn btn-accent btn-large" style="display: flex; align-items: center; justify-content: center; text-decoration: none;">
+                                Upload a File
+                            </a>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="report-section">
+                    <button id="report-btn" class="btn btn-secondary" style="font-size: 0.875rem;">
+                        <i data-lucide="flag"></i> Report this file
+                    </button>
+                </div>
+
+                <div id="report-modal" class="modal hidden">
+                    <div class="modal-content">
+                        <h3>Report File</h3>
+                        <p style="color: #555; margin-bottom: 1.5rem;">Are you sure you want to report this file for violating our terms of service?</p>
+                        <div style="display: flex; gap: 1rem; justify-content: center;">
+                            <button id="report-cancel" class="btn btn-secondary">Cancel</button>
+                            <button id="report-confirm" class="btn btn-accent">Report</button>
+                        </div>
                     </div>
                 </div>
             </div>
         </main>
 
         <footer>
-            <p>Files are decrypted in your browser.</p>
-            <p>We never see your encryption keys.</p>
+            <p>Secured file sharing made easy. Powered by CNS</p>
         </footer>
     </div>
 
@@ -126,6 +141,16 @@
             baseURL: "{{.baseURL}}",
             fileID: "{{.fileID}}"
         };
+    </script>
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <script>
+        document.addEventListener("DOMContentLoaded", function() {
+            if (window.lucide && lucide.createIcons) {
+                lucide.createIcons();
+            } else if (window.lucide && lucide.replace) {
+                lucide.replace();
+            }
+        });
     </script>
     <script src="/static/js/crypto.js"></script>
     <script src="/static/js/download.js"></script>

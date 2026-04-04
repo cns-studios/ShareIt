@@ -1,5 +1,3 @@
-version: '3.8'
-
 services:
   app:
     build:
@@ -12,9 +10,9 @@ services:
       - BASE_URL=${BASE_URL:-http://localhost:8080}
       - POSTGRES_HOST=postgres
       - POSTGRES_PORT=5432
-      - POSTGRES_USER=${POSTGRES_USER:-secureshare}
-      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-secureshare}
-      - POSTGRES_DB=${POSTGRES_DB:-secureshare}
+      - POSTGRES_USER=${POSTGRES_USER:-shareit}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-shareit}
+      - POSTGRES_DB=${POSTGRES_DB:-shareit}
       - REDIS_HOST=redis
       - REDIS_PORT=6379
       - DATA_DIR=/data
@@ -31,25 +29,25 @@ services:
         condition: service_healthy
     restart: unless-stopped
     networks:
-      - secureshare
+      - shareit
 
   postgres:
     image: postgres:16-alpine
     environment:
-      - POSTGRES_USER=${POSTGRES_USER:-secureshare}
-      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-secureshare}
-      - POSTGRES_DB=${POSTGRES_DB:-secureshare}
+      - POSTGRES_USER=${POSTGRES_USER:-shareit}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-shareit}
+      - POSTGRES_DB=${POSTGRES_DB:-shareit}
     volumes:
       - postgres_data:/var/lib/postgresql/data
       - ./init.sql:/docker-entrypoint-initdb.d/init.sql:ro
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-secureshare} -d ${POSTGRES_DB:-secureshare}"]
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-shareit} -d ${POSTGRES_DB:-shareit}"]
       interval: 5s
       timeout: 5s
       retries: 5
     restart: unless-stopped
     networks:
-      - secureshare
+      - shareit
 
   redis:
     image: redis:7-alpine
@@ -63,7 +61,7 @@ services:
       retries: 5
     restart: unless-stopped
     networks:
-      - secureshare
+      - shareit
 
 volumes:
   file_data:
@@ -71,5 +69,5 @@ volumes:
   redis_data:
 
 networks:
-  secureshare:
+  shareit:
     driver: bridge

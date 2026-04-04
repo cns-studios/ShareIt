@@ -5,25 +5,30 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{{.title}}</title>
     <link rel="stylesheet" href="/static/css/style.css">
+    <script src="https://unpkg.com/lucide@latest"></script>
 </head>
 <body>
+    <div class="grid-line v-line" style="left: 10%;"></div>
+    <div class="grid-line v-line" style="left: 90%;"></div>
+    <div class="grid-line h-line" style="top: 15%;"></div>
+
     <div class="container">
         <header>
-            <a href="/" class="logo-link">
-                <h1>🔒 SecureShare</h1>
-            </a>
-            <p class="subtitle">End-to-End Encrypted File Sharing</p>
+            <div class="space-y-1">
+                <h1><a href="/" style="text-decoration: none; color: inherit;">ShareIt</a></h1>
+                <p class="subtitle">End-to-End Encrypted File Sharing</p>
+            </div>
         </header>
 
-        <main>
+        <main style="padding: 3rem 1.5rem; max-width: 800px; margin: 0 auto;">
             <article class="legal-document">
                 <h1>Privacy Policy</h1>
-                <p class="last-updated">Last updated: January 2025</p>
+                <p class="last-updated">Last updated: April 2026</p>
 
                 <section>
                     <h2>1. Introduction</h2>
                     <p>
-                        SecureShare ("we", "our", or "us") is committed to protecting your privacy. 
+                        ShareIt ("we", "our", or "us") is committed to protecting your privacy. 
                         This Privacy Policy explains how we collect, use, and safeguard your information 
                         when you use our file sharing service.
                     </p>
@@ -32,7 +37,7 @@
                 <section>
                     <h2>2. End-to-End Encryption</h2>
                     <p>
-                        SecureShare uses client-side end-to-end encryption. This means:
+                        ShareIt uses client-side end-to-end encryption. This means:
                     </p>
                     <ul>
                         <li>Your files are encrypted in your browser before upload</li>
@@ -165,12 +170,12 @@
             </article>
 
             <div class="back-link">
-                <a href="/" class="btn btn-secondary">← Back to Home</a>
+                <a href="/" class="btn btn-secondary">< Back to Home</a>
             </div>
         </main>
 
         <footer>
-            <p>SecureShare - End-to-End Encrypted File Sharing</p>
+            <p>Secured file sharing made easy. Powered by CNS</p>
         </footer>
     </div>
 </body>

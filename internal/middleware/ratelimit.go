@@ -3,8 +3,8 @@ package middleware
 import (
 	"net/http"
 
-	"secureshare/internal/models"
-	"secureshare/internal/storage"
+	"shareit/internal/models"
+	"shareit/internal/storage"
 
 	"github.com/gin-gonic/gin"
 )
@@ -23,17 +23,17 @@ func (rl *RateLimiter) Handler() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		ip := GetClientIP(c)
 		
-		// Skip rate limiting for unknown IPs (shouldn't happen, but safety first)
+		 
 		if ip == "unknown" {
 			c.Next()
 			return
 		}
 
-		// Check rate limit
+		 
 		allowed, err := rl.redis.CheckRateLimit(c.Request.Context(), ip)
 		if err != nil {
-			// On Redis error, allow the request but log
-			// In production, you might want to be more strict
+			 
+			 
 			c.Next()
 			return
 		}
@@ -51,7 +51,7 @@ func (rl *RateLimiter) Handler() gin.HandlerFunc {
 	}
 }
 
-// NewStrictRateLimiter creates a rate limiter that blocks on Redis errors
+ 
 func NewStrictRateLimiter(redis *storage.Redis) *RateLimiter {
 	return &RateLimiter{
 		redis: redis,
@@ -94,8 +94,8 @@ func (rl *RateLimiter) StrictHandler() gin.HandlerFunc {
 	}
 }
 
-// DownloadRateLimiter is a separate rate limiter for downloads
-// with different limits
+ 
+ 
 type DownloadRateLimiter struct {
 	redis      *storage.Redis
 	maxPerMin  int64
@@ -119,7 +119,7 @@ func (drl *DownloadRateLimiter) Handler() gin.HandlerFunc {
 			return
 		}
 
-		// Use custom rate limiting for downloads
+		 
 		ctx := c.Request.Context()
 		key := drl.keyPrefix + ip
 		
@@ -129,9 +129,9 @@ func (drl *DownloadRateLimiter) Handler() gin.HandlerFunc {
 			return
 		}
 
-		// Set expiry on first request
+		 
 		if count == 1 {
-			drl.redis.Client().Expire(ctx, key, 60) // 1 minute
+			drl.redis.Client().Expire(ctx, key, 60)  
 		}
 
 		if count > drl.maxPerMin {

@@ -1,12 +1,7 @@
-/**
- * SecureShare Crypto Module
- * Handles client-side encryption and decryption using Web Crypto API
- */
-
 const SecureCrypto = (function() {
     'use strict';
 
-    // Configuration
+     
     const CONFIG = {
         algorithm: 'AES-GCM',
         keyLength: 256,
@@ -16,12 +11,9 @@ const SecureCrypto = (function() {
         wordCount: 5
     };
 
-    // Word list will be loaded from server
+     
     let wordList = null;
 
-    /**
-     * Load word list from server
-     */
     async function loadWordList() {
         if (wordList) return wordList;
         
@@ -37,9 +29,6 @@ const SecureCrypto = (function() {
         }
     }
 
-    /**
-     * Generate random words for password
-     */
     async function generatePassword() {
         const words = await loadWordList();
         const selectedWords = [];
@@ -54,14 +43,11 @@ const SecureCrypto = (function() {
         return selectedWords.join('-');
     }
 
-    /**
-     * Derive encryption key from password using PBKDF2
-     */
     async function deriveKey(password, salt) {
         const encoder = new TextEncoder();
         const passwordBuffer = encoder.encode(password);
 
-        // Import password as raw key material
+         
         const keyMaterial = await crypto.subtle.importKey(
             'raw',
             passwordBuffer,
@@ -70,7 +56,7 @@ const SecureCrypto = (function() {
             ['deriveKey']
         );
 
-        // Derive AES key
+         
         const key = await crypto.subtle.deriveKey(
             {
                 name: 'PBKDF2',
@@ -90,19 +76,14 @@ const SecureCrypto = (function() {
         return key;
     }
 
-    /**
-     * Generate random bytes
-     */
+
     function generateRandomBytes(length) {
         const bytes = new Uint8Array(length);
         crypto.getRandomValues(bytes);
         return bytes;
     }
 
-    /**
-     * Encrypt data with password
-     * Returns: salt (16 bytes) + iv (12 bytes) + ciphertext
-     */
+
     async function encrypt(data, password) {
         const salt = generateRandomBytes(CONFIG.saltLength);
         const iv = generateRandomBytes(CONFIG.ivLength);
@@ -117,7 +98,7 @@ const SecureCrypto = (function() {
             data
         );
 
-        // Combine salt + iv + ciphertext
+         
         const result = new Uint8Array(salt.length + iv.length + ciphertext.byteLength);
         result.set(salt, 0);
         result.set(iv, salt.length);
@@ -126,14 +107,11 @@ const SecureCrypto = (function() {
         return result;
     }
 
-    /**
-     * Decrypt data with password
-     * Input format: salt (16 bytes) + iv (12 bytes) + ciphertext
-     */
+
     async function decrypt(encryptedData, password) {
         const data = new Uint8Array(encryptedData);
 
-        // Extract salt, iv, and ciphertext
+         
         const salt = data.slice(0, CONFIG.saltLength);
         const iv = data.slice(CONFIG.saltLength, CONFIG.saltLength + CONFIG.ivLength);
         const ciphertext = data.slice(CONFIG.saltLength + CONFIG.ivLength);
@@ -156,9 +134,6 @@ const SecureCrypto = (function() {
         }
     }
 
-    /**
-     * Encrypt a file and return encrypted blob
-     */
     async function encryptFile(file, password, onProgress) {
         return new Promise((resolve, reject) => {
             const reader = new FileReader();
@@ -186,9 +161,6 @@ const SecureCrypto = (function() {
         });
     }
 
-    /**
-     * Decrypt a blob and return decrypted data
-     */
     async function decryptBlob(blob, password, onProgress) {
         return new Promise((resolve, reject) => {
             const reader = new FileReader();
@@ -216,9 +188,6 @@ const SecureCrypto = (function() {
         });
     }
 
-    /**
-     * Validate password format (5 words separated by hyphens)
-     */
     function validatePassword(password) {
         if (!password || typeof password !== 'string') {
             return { valid: false, error: 'Password is required' };
@@ -251,9 +220,6 @@ const SecureCrypto = (function() {
         return { valid: true };
     }
 
-    /**
-     * Parse password from URL hash
-     */
     function getPasswordFromHash() {
         const hash = window.location.hash;
         if (!hash || hash.length <= 1) {
@@ -262,9 +228,6 @@ const SecureCrypto = (function() {
         return decodeURIComponent(hash.substring(1));
     }
 
-    /**
-     * Format file size for display
-     */
     function formatFileSize(bytes) {
         if (bytes === 0) return '0 Bytes';
         
@@ -275,17 +238,11 @@ const SecureCrypto = (function() {
         return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
     }
 
-    /**
-     * Format date for display
-     */
     function formatDate(dateString) {
         const date = new Date(dateString);
         return date.toLocaleString();
     }
 
-    /**
-     * Calculate time remaining until expiration
-     */
     function getTimeRemaining(expiresAt) {
         const now = new Date();
         const expires = new Date(expiresAt);
@@ -308,7 +265,7 @@ const SecureCrypto = (function() {
         }
     }
 
-    // Public API
+     
     return {
         generatePassword,
         encryptFile,
@@ -322,5 +279,5 @@ const SecureCrypto = (function() {
     };
 })();
 
-// Export for use in other scripts
+ 
 window.SecureCrypto = SecureCrypto;

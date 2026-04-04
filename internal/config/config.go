@@ -10,37 +10,37 @@ import (
 )
 
 type Config struct {
-	// Server
+	 
 	Port    string
 	BaseURL string
 
-	// PostgreSQL
+	 
 	PostgresHost     string
 	PostgresPort     string
 	PostgresUser     string
 	PostgresPassword string
 	PostgresDB       string
 
-	// Redis
+	 
 	RedisHost string
 	RedisPort string
 
-	// Storage
+	 
 	DataDir string
 
-	// Proxy
+	 
 	BehindCloudflare bool
 
-	// Limits
+	 
 	MaxFileSize           int64
 	AutoDeleteReportCount int
 
-	// Discord
+	 
 	DiscordWebhookURL string
 }
 
 func Load() (*Config, error) {
-	// Load .env file if exists (for local development)
+	 
 	_ = godotenv.Load()
 
 	cfg := &Config{
@@ -48,19 +48,19 @@ func Load() (*Config, error) {
 		BaseURL:               getEnv("BASE_URL", "http://localhost:8080"),
 		PostgresHost:          getEnv("POSTGRES_HOST", "localhost"),
 		PostgresPort:          getEnv("POSTGRES_PORT", "5432"),
-		PostgresUser:          getEnv("POSTGRES_USER", "secureshare"),
-		PostgresPassword:      getEnv("POSTGRES_PASSWORD", "secureshare"),
-		PostgresDB:            getEnv("POSTGRES_DB", "secureshare"),
+		PostgresUser:          getEnv("POSTGRES_USER", "shareit"),
+		PostgresPassword:      getEnv("POSTGRES_PASSWORD", "shareit"),
+		PostgresDB:            getEnv("POSTGRES_DB", "shareit"),
 		RedisHost:             getEnv("REDIS_HOST", "localhost"),
 		RedisPort:             getEnv("REDIS_PORT", "6379"),
 		DataDir:               getEnv("DATA_DIR", "./data"),
 		BehindCloudflare:      getEnvBool("BEHIND_CLOUDFLARE", false),
-		MaxFileSize:           getEnvInt64("MAX_FILE_SIZE", 786432000), // 750MB
+		MaxFileSize:           getEnvInt64("MAX_FILE_SIZE", 786432000),  
 		AutoDeleteReportCount: getEnvInt("AUTO_DELETE_REPORT_COUNT", 3),
 		DiscordWebhookURL:     getEnv("DISCORD_WEBHOOK_URL", ""),
 	}
 
-	// Validate configuration
+	 
 	if err := cfg.validate(); err != nil {
 		return nil, err
 	}

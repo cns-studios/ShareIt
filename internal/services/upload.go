@@ -8,9 +8,9 @@ import (
 	"sync"
 	"time"
 
-	"secureshare/internal/config"
-	"secureshare/internal/models"
-	"secureshare/internal/storage"
+	"shareit/internal/config"
+	"shareit/internal/models"
+	"shareit/internal/storage"
 )
 
 type Upload struct {
@@ -32,13 +32,13 @@ func NewUpload(cfg *config.Config, db *storage.Postgres, redis *storage.Redis, f
 	}
 }
 
-// StartPendingCleanup starts the background job to clean up abandoned uploads
+ 
 func (u *Upload) StartPendingCleanup() {
 	u.wg.Add(1)
 	go u.runPendingCleanup()
 }
 
-// Stop gracefully stops the upload service
+ 
 func (u *Upload) Stop() {
 	close(u.stopChan)
 	u.wg.Wait()
@@ -47,7 +47,7 @@ func (u *Upload) Stop() {
 func (u *Upload) runPendingCleanup() {
 	defer u.wg.Done()
 
-	// Run every minute
+	 
 	ticker := time.NewTicker(1 * time.Minute)
 	defer ticker.Stop()
 
@@ -66,7 +66,7 @@ func (u *Upload) cleanupPendingUploads() {
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 
-	// Get all sessions from filesystem
+	 
 	sessionIDs, err := u.fs.GetAllSessionIDs()
 	if err != nil {
 		log.Printf("Error getting session IDs: %v", err)
@@ -74,10 +74,10 @@ func (u *Upload) cleanupPendingUploads() {
 	}
 
 	for _, sessionID := range sessionIDs {
-		// Check if session still exists in Redis
+		 
 		session, err := u.redis.GetUploadSession(ctx, sessionID)
 		if err == models.ErrSessionNotFound {
-			// Session expired, clean up chunks
+			 
 			log.Printf("Cleaning up expired session: %s", sessionID)
 			if err := u.fs.DeleteChunks(sessionID); err != nil {
 				log.Printf("Error deleting chunks for session %s: %v", sessionID, err)
@@ -89,7 +89,7 @@ func (u *Upload) cleanupPendingUploads() {
 			continue
 		}
 
-		// Check if the associated file is still pending
+		 
 		isPending, err := u.redis.IsFilePending(ctx, session.FileID)
 		if err != nil {
 			log.Printf("Error checking pending status for file %s: %v", session.FileID, err)
@@ -97,35 +97,34 @@ func (u *Upload) cleanupPendingUploads() {
 		}
 
 		if !isPending {
-			// File was confirmed or pending expired, check if file exists in DB
-			_, err := u.db.GetFileByID(ctx, session.FileID)
-			if err == models.ErrFileNotFound {
-				// File was never confirmed, clean up
-				log.Printf("Cleaning up abandoned upload: session=%s, file=%s", sessionID, session.FileID)
+			 
+			 
+			chunkCount, chunkErr := u.fs.GetChunkCount(sessionID)
+			if chunkErr != nil {
+				log.Printf("Error checking chunk count for session %s: %v", sessionID, chunkErr)
+				continue
+			}
+
+			if chunkCount == 0 && u.fs.FileExists(session.FileID) {
+				log.Printf("Cleaning up abandoned pending upload: session=%s, file=%s", sessionID, session.FileID)
 				u.CleanupSession(ctx, sessionID)
 			}
 		}
 	}
 }
 
-// InitUpload initializes a new upload session
+ 
 func (u *Upload) InitUpload(ctx context.Context, req *models.UploadInitRequest, uploaderIP string) (*models.UploadInitResponse, error) {
-	// Validate file size
+	 
 	if req.FileSize > u.cfg.MaxFileSize {
 		return nil, models.ErrFileTooLarge
 	}
 
-	// Parse and validate duration
-	duration, err := models.ParseDuration(req.Duration)
-	if err != nil {
-		return nil, err
-	}
-
-	// Generate IDs
+	 
 	sessionID := models.GenerateSessionID()
 	fileID := models.GenerateID(17)
 
-	// Create upload session
+	 
 	session := &models.UploadSession{
 		SessionID:    sessionID,
 		FileID:       fileID,
@@ -134,26 +133,18 @@ func (u *Upload) InitUpload(ctx context.Context, req *models.UploadInitRequest, 
 		TotalChunks:  req.TotalChunks,
 		ChunkSize:    req.ChunkSize,
 		UploaderIP:   uploaderIP,
-		ExpiresAt:    time.Now().Add(duration),
 		CreatedAt:    time.Now(),
 	}
 
-	// Store session in Redis
+	 
 	if err := u.redis.CreateUploadSession(ctx, session); err != nil {
 		return nil, fmt.Errorf("error creating upload session: %w", err)
 	}
 
-	// Create chunk directory
+	 
 	if err := u.fs.CreateChunkDir(sessionID); err != nil {
 		u.redis.DeleteUploadSession(ctx, sessionID)
 		return nil, fmt.Errorf("error creating chunk directory: %w", err)
-	}
-
-	// Mark file as pending
-	if err := u.redis.MarkFilePending(ctx, fileID, sessionID); err != nil {
-		u.fs.DeleteChunks(sessionID)
-		u.redis.DeleteUploadSession(ctx, sessionID)
-		return nil, fmt.Errorf("error marking file as pending: %w", err)
 	}
 
 	return &models.UploadInitResponse{
@@ -164,20 +155,20 @@ func (u *Upload) InitUpload(ctx context.Context, req *models.UploadInitRequest, 
 	}, nil
 }
 
-// UploadChunk handles uploading a single chunk
+ 
 func (u *Upload) UploadChunk(ctx context.Context, sessionID string, chunkIndex int, data io.Reader) error {
-	// Get session
+	 
 	session, err := u.redis.GetUploadSession(ctx, sessionID)
 	if err != nil {
 		return err
 	}
 
-	// Validate chunk index
+	 
 	if chunkIndex < 0 || chunkIndex >= session.TotalChunks {
 		return models.ErrInvalidChunk
 	}
 
-	// Check if chunk already uploaded
+	 
 	exists, err := u.redis.IsChunkUploaded(ctx, sessionID, chunkIndex)
 	if err != nil {
 		return err
@@ -186,20 +177,20 @@ func (u *Upload) UploadChunk(ctx context.Context, sessionID string, chunkIndex i
 		return models.ErrChunkAlreadyExists
 	}
 
-	// Save chunk to filesystem
+	 
 	_, err = u.fs.SaveChunk(sessionID, chunkIndex, data)
 	if err != nil {
 		return fmt.Errorf("error saving chunk: %w", err)
 	}
 
-	// Mark chunk as uploaded in Redis
+	 
 	if err := u.redis.MarkChunkUploaded(ctx, sessionID, chunkIndex); err != nil {
-		// Try to clean up the saved chunk
-		// fs.DeleteChunk is not implemented, but chunks will be cleaned up eventually
+		 
+		 
 		return fmt.Errorf("error marking chunk as uploaded: %w", err)
 	}
 
-	// Extend session TTL
+	 
 	if err := u.redis.ExtendUploadSession(ctx, sessionID); err != nil {
 		log.Printf("Warning: failed to extend session TTL: %v", err)
 	}
@@ -207,15 +198,15 @@ func (u *Upload) UploadChunk(ctx context.Context, sessionID string, chunkIndex i
 	return nil
 }
 
-// CompleteUpload finalizes the upload and assembles chunks
+ 
 func (u *Upload) CompleteUpload(ctx context.Context, sessionID string) (*models.UploadCompleteResponse, error) {
-	// Get session
+	 
 	session, err := u.redis.GetUploadSession(ctx, sessionID)
 	if err != nil {
 		return nil, err
 	}
 
-	// Check all chunks are uploaded
+	 
 	uploadedCount, err := u.redis.GetUploadedChunkCount(ctx, sessionID)
 	if err != nil {
 		return nil, err
@@ -225,77 +216,123 @@ func (u *Upload) CompleteUpload(ctx context.Context, sessionID string) (*models.
 		return nil, models.ErrUploadIncomplete
 	}
 
-	// Assemble chunks into final file
+	 
 	if err := u.fs.AssembleChunks(sessionID, session.FileID, session.TotalChunks); err != nil {
 		return nil, fmt.Errorf("error assembling chunks: %w", err)
 	}
 
-	// Get actual file size
+	 
+	pendingTTL := u.redis.PendingTTL()
+	if err := u.redis.MarkFilePending(ctx, session.FileID, sessionID); err != nil {
+		u.fs.DeleteFile(session.FileID)
+		return nil, fmt.Errorf("error marking file as pending: %w", err)
+	}
+	if err := u.redis.SetUploadSessionTTL(ctx, sessionID, pendingTTL); err != nil {
+		log.Printf("Warning: failed to shrink session TTL for pending upload %s: %v", sessionID, err)
+	}
+
+	 
+	u.redis.DeleteChunkTracking(ctx, sessionID)
+
+	return &models.UploadCompleteResponse{
+		SessionID:        sessionID,
+		FileID:           session.FileID,
+		PendingExpiresAt: time.Now().Add(pendingTTL),
+	}, nil
+}
+
+ 
+func (u *Upload) FinalizeUpload(ctx context.Context, sessionID, duration string) (*models.UploadFinalizeResponse, error) {
+	session, err := u.redis.GetUploadSession(ctx, sessionID)
+	if err != nil {
+		if err == models.ErrSessionNotFound {
+			return nil, models.ErrSessionExpired
+		}
+		return nil, err
+	}
+
+	isPending, err := u.redis.IsFilePending(ctx, session.FileID)
+	if err != nil {
+		return nil, err
+	}
+	if !isPending {
+		return nil, models.ErrUploadNotPending
+	}
+
+	dur, err := models.ParseFinalizeDuration(duration)
+	if err != nil {
+		return nil, err
+	}
+
 	actualSize, err := u.fs.GetFileSize(session.FileID)
 	if err != nil {
 		return nil, fmt.Errorf("error getting file size: %w", err)
 	}
 
-	// Generate numeric code for this file
-	var numericCode string
-	for i := 0; i < 10; i++ {
-		numericCode = models.GenerateNumericCode()
-		exists, err := u.db.NumericCodeExists(ctx, numericCode)
-		if err != nil {
-			return nil, fmt.Errorf("error checking numeric code: %w", err)
-		}
-		if !exists {
-			break
-		}
+	numericCode, err := u.generateUniqueNumericCode(ctx)
+	if err != nil {
+		return nil, err
 	}
 
-	// Create file record in database
 	file := &models.File{
 		ID:           session.FileID,
 		NumericCode:  numericCode,
 		OriginalName: session.OriginalName,
 		SizeBytes:    actualSize,
 		UploaderIP:   session.UploaderIP,
-		ExpiresAt:    session.ExpiresAt,
+		ExpiresAt:    time.Now().Add(dur),
 		CreatedAt:    time.Now(),
 	}
 
 	if err := u.db.CreateFile(ctx, file); err != nil {
-		// Clean up on error
-		u.fs.DeleteFile(session.FileID)
 		return nil, fmt.Errorf("error creating file record: %w", err)
 	}
 
-	// Clean up Redis data
 	u.redis.RemovePendingFile(ctx, session.FileID)
 	u.redis.DeleteUploadSession(ctx, sessionID)
 	u.redis.DeleteChunkTracking(ctx, sessionID)
 
-	// Build share URL
 	shareURL := fmt.Sprintf("%s/shared/%s", u.cfg.BaseURL, session.FileID)
-
-	return &models.UploadCompleteResponse{
+	return &models.UploadFinalizeResponse{
 		FileID:      session.FileID,
 		NumericCode: numericCode,
 		ShareURL:    shareURL,
 	}, nil
 }
 
-// CancelUpload cancels an in-progress upload
+func (u *Upload) generateUniqueNumericCode(ctx context.Context) (string, error) {
+	for i := 0; i < 10; i++ {
+		numericCode := models.GenerateNumericCode()
+		exists, err := u.db.NumericCodeExists(ctx, numericCode)
+		if err != nil {
+			return "", fmt.Errorf("error checking numeric code: %w", err)
+		}
+		if !exists {
+			return numericCode, nil
+		}
+	}
+
+	return "", fmt.Errorf("failed to generate unique numeric code")
+}
+
+ 
 func (u *Upload) CancelUpload(ctx context.Context, sessionID string) error {
-	// Get session to find file ID
+	 
 	session, err := u.redis.GetUploadSession(ctx, sessionID)
 	if err != nil && err != models.ErrSessionNotFound {
 		return err
 	}
 
-	// Clean up chunks
+	 
 	if err := u.fs.DeleteChunks(sessionID); err != nil {
 		log.Printf("Error deleting chunks for session %s: %v", sessionID, err)
 	}
 
-	// Clean up Redis
+	 
 	if session != nil {
+		if u.fs.FileExists(session.FileID) {
+			u.fs.DeleteFile(session.FileID)
+		}
 		u.redis.RemovePendingFile(ctx, session.FileID)
 	}
 	u.redis.DeleteUploadSession(ctx, sessionID)
@@ -304,33 +341,33 @@ func (u *Upload) CancelUpload(ctx context.Context, sessionID string) error {
 	return nil
 }
 
-// CleanupSession removes all traces of an upload session
+ 
 func (u *Upload) CleanupSession(ctx context.Context, sessionID string) {
 	session, _ := u.redis.GetUploadSession(ctx, sessionID)
 	
-	// Delete chunks
+	 
 	if err := u.fs.DeleteChunks(sessionID); err != nil {
 		log.Printf("Error deleting chunks for session %s: %v", sessionID, err)
 	}
 
-	// Delete file if it exists and wasn't committed
+	 
 	if session != nil {
 		if u.fs.FileExists(session.FileID) {
 			_, err := u.db.GetFileByID(ctx, session.FileID)
 			if err == models.ErrFileNotFound {
-				// File wasn't committed, safe to delete
+				 
 				u.fs.DeleteFile(session.FileID)
 			}
 		}
 		u.redis.RemovePendingFile(ctx, session.FileID)
 	}
 
-	// Clean up Redis
+	 
 	u.redis.DeleteUploadSession(ctx, sessionID)
 	u.redis.DeleteChunkTracking(ctx, sessionID)
 }
 
-// GetUploadProgress returns the current upload progress
+ 
 func (u *Upload) GetUploadProgress(ctx context.Context, sessionID string) (int, int, error) {
 	session, err := u.redis.GetUploadSession(ctx, sessionID)
 	if err != nil {

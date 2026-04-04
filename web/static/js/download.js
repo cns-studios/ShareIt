@@ -1,17 +1,12 @@
-/**
- * SecureShare Download Page
- * Handles file download and client-side decryption
- */
-
 (function() {
     'use strict';
 
-    // State
+     
     let fileMetadata = null;
     let encryptedBlob = null;
     let currentPassword = null;
 
-    // DOM Elements
+     
     const loadingSection = document.getElementById('loading-section');
     const passwordSection = document.getElementById('password-section');
     const autoDecryptSection = document.getElementById('auto-decrypt-section');
@@ -41,9 +36,6 @@
     const reportCancel = document.getElementById('report-cancel');
     const reportConfirm = document.getElementById('report-confirm');
 
-    /**
-     * Initialize the page
-     */
     async function init() {
         const fileID = window.CONFIG?.fileID;
         
@@ -56,9 +48,6 @@
         await loadFileMetadata(fileID);
     }
 
-    /**
-     * Set up event listeners
-     */
     function setupEventListeners() {
         downloadAutoBtn?.addEventListener('click', () => downloadAndDecrypt(currentPassword));
         downloadManualBtn?.addEventListener('click', () => {
@@ -68,14 +57,14 @@
         downloadAgainBtn?.addEventListener('click', () => downloadAndDecrypt(currentPassword));
         retryBtn?.addEventListener('click', resetToPasswordEntry);
 
-        // Password input enter key
+         
         passwordInput?.addEventListener('keypress', (e) => {
             if (e.key === 'Enter') {
                 downloadManualBtn.click();
             }
         });
 
-        // Report functionality
+         
         reportBtn?.addEventListener('click', () => {
             reportModal.classList.remove('hidden');
         });
@@ -86,7 +75,7 @@
 
         reportConfirm?.addEventListener('click', submitReport);
 
-        // Close modal on outside click
+         
         reportModal?.addEventListener('click', (e) => {
             if (e.target === reportModal) {
                 reportModal.classList.add('hidden');
@@ -94,9 +83,6 @@
         });
     }
 
-    /**
-     * Load file metadata from server
-     */
     async function loadFileMetadata(fileID) {
         try {
             const response = await fetch(`/api/file/${fileID}`);
@@ -110,7 +96,7 @@
             fileMetadata = await response.json();
             displayFileMetadata();
 
-            // Check for password in URL hash
+             
             const hashPassword = SecureCrypto.getPasswordFromHash();
             if (hashPassword) {
                 const validation = SecureCrypto.validatePassword(hashPassword);
@@ -134,9 +120,6 @@
         }
     }
 
-    /**
-     * Display file metadata
-     */
     function displayFileMetadata() {
         fileNameEl.textContent = fileMetadata.original_name;
         fileSizeEl.textContent = SecureCrypto.formatFileSize(fileMetadata.size_bytes);
@@ -144,32 +127,29 @@
         fileExpiresEl.textContent = SecureCrypto.getTimeRemaining(fileMetadata.expires_at);
     }
 
-    /**
-     * Download and decrypt file
-     */
     async function downloadAndDecrypt(password) {
-        // Validate password
+         
         const validation = SecureCrypto.validatePassword(password);
         if (!validation.valid) {
-            showError('Invalid Password', validation.error);
+            showError('Invalid Passcode', validation.error);
             retryBtn.classList.remove('hidden');
             return;
         }
 
         currentPassword = password;
 
-        // Show progress
+         
         passwordSection.classList.add('hidden');
         progressSection.classList.remove('hidden');
         successSection.classList.add('hidden');
         errorSection.classList.add('hidden');
 
         try {
-            // Download encrypted file
-            updateProgress(0, 'Downloading encrypted file...');
+             
+            updateProgress(0, 'Downloading file...');
             encryptedBlob = await downloadEncryptedFile();
 
-            // Decrypt file
+             
             updateProgress(50, 'Decrypting file...');
             const decryptedData = await SecureCrypto.decryptBlob(
                 encryptedBlob,
@@ -179,13 +159,13 @@
                 }
             );
 
-            // Trigger download
+             
             updateProgress(95, 'Preparing download...');
             triggerDownload(decryptedData, fileMetadata.original_name);
 
             updateProgress(100, 'Complete!');
 
-            // Show success
+             
             progressSection.classList.add('hidden');
             successSection.classList.remove('hidden');
 
@@ -194,7 +174,7 @@
             progressSection.classList.add('hidden');
             
             if (error.message.includes('Decryption failed')) {
-                showError('Decryption Failed', 'Invalid password. Please check and try again.');
+                showError('Decryption Failed', 'Invalid passcode. Please check and try again.');
                 retryBtn.classList.remove('hidden');
             } else {
                 showError('Download Failed', error.message);
@@ -203,9 +183,6 @@
         }
     }
 
-    /**
-     * Download encrypted file from server
-     */
     async function downloadEncryptedFile() {
         const response = await fetch(`/api/file/${fileMetadata.id}/download`);
         
@@ -237,9 +214,6 @@
         return new Blob(chunks);
     }
 
-    /**
-     * Trigger file download
-     */
     function triggerDownload(data, filename) {
         const blob = new Blob([data], { type: 'application/octet-stream' });
         const url = URL.createObjectURL(blob);
@@ -252,16 +226,13 @@
         document.body.appendChild(a);
         a.click();
         
-        // Cleanup
+         
         setTimeout(() => {
             document.body.removeChild(a);
             URL.revokeObjectURL(url);
         }, 100);
     }
 
-    /**
-     * Submit report
-     */
     async function submitReport() {
         reportConfirm.disabled = true;
         reportConfirm.textContent = 'Reporting...';
@@ -291,9 +262,6 @@
         }
     }
 
-    /**
-     * Handle API errors
-     */
     function handleAPIError(error) {
         loadingSection.classList.add('hidden');
         
@@ -312,9 +280,6 @@
         }
     }
 
-    /**
-     * Show error
-     */
     function showError(title, message) {
         errorTitle.textContent = title;
         errorMessage.textContent = message;
@@ -326,14 +291,11 @@
         errorSection.classList.remove('hidden');
     }
 
-    /**
-     * Reset to password entry
-     */
     function resetToPasswordEntry() {
         errorSection.classList.add('hidden');
         passwordSection.classList.remove('hidden');
         
-        // Show manual entry if auto failed
+         
         autoDecryptSection.classList.add('hidden');
         manualDecryptSection.classList.remove('hidden');
         
@@ -341,9 +303,6 @@
         passwordInput.focus();
     }
 
-    /**
-     * Update progress
-     */
     function updateProgress(percent, text) {
         progressFill.style.width = `${percent}%`;
         if (text) {
@@ -351,9 +310,6 @@
         }
     }
 
-    /**
-     * Show toast notification
-     */
     function showToast(message) {
         const existingToast = document.querySelector('.toast');
         if (existingToast) {
@@ -384,7 +340,7 @@
         }, 4000);
     }
 
-    // Initialize
+     
     if (document.readyState === 'loading') {
         document.addEventListener('DOMContentLoaded', init);
     } else {

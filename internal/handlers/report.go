@@ -4,11 +4,11 @@ import (
 	"net/http"
 	"time"
 
-	"secureshare/internal/config"
-	"secureshare/internal/middleware"
-	"secureshare/internal/models"
-	"secureshare/internal/services"
-	"secureshare/internal/storage"
+	"shareit/internal/config"
+	"shareit/internal/middleware"
+	"shareit/internal/models"
+	"shareit/internal/services"
+	"shareit/internal/storage"
 
 	"github.com/gin-gonic/gin"
 )
@@ -27,7 +27,7 @@ func NewReportHandler(cfg *config.Config, db *storage.Postgres, discord *service
 	}
 }
 
-// Report handles POST /api/file/:id/report
+ 
 func (h *ReportHandler) Report(c *gin.Context) {
 	fileID := c.Param("id")
 	if fileID == "" {
@@ -38,10 +38,10 @@ func (h *ReportHandler) Report(c *gin.Context) {
 		return
 	}
 
-	// Get client IP
+	 
 	reporterIP := middleware.GetClientIP(c)
 
-	// Get file from database
+	 
 	file, err := h.db.GetFileByID(c.Request.Context(), fileID)
 	if err != nil {
 		if appErr, ok := err.(*models.AppError); ok {
@@ -62,7 +62,7 @@ func (h *ReportHandler) Report(c *gin.Context) {
 		return
 	}
 
-	// Check if user has already reported this file
+	 
 	hasReported, err := h.db.HasUserReportedFile(c.Request.Context(), fileID, reporterIP)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, models.ErrorResponse{
@@ -80,7 +80,7 @@ func (h *ReportHandler) Report(c *gin.Context) {
 		return
 	}
 
-	// Create report record
+	 
 	report := &models.Report{
 		FileID:     fileID,
 		ReporterIP: reporterIP,
@@ -95,7 +95,7 @@ func (h *ReportHandler) Report(c *gin.Context) {
 		return
 	}
 
-	// Increment report count
+	 
 	newReportCount, err := h.db.IncrementReportCount(c.Request.Context(), fileID)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, models.ErrorResponse{
@@ -105,23 +105,23 @@ func (h *ReportHandler) Report(c *gin.Context) {
 		return
 	}
 
-	// Update file object with new report count for notification
+	 
 	file.ReportCount = newReportCount
 
-	// Send Discord notification
+	 
 	if err := h.discord.SendReportNotification(file, reporterIP, newReportCount); err != nil {
-		// Log error but don't fail the request
+		 
 		println("Failed to send Discord notification:", err.Error())
 	}
 
-	// Check if file should be auto-deleted
+	 
 	if newReportCount >= h.cfg.AutoDeleteReportCount {
-		// Mark file as deleted
+		 
 		if err := h.db.MarkFileDeleted(c.Request.Context(), fileID); err != nil {
-			// Log error but don't fail the request
+			 
 			println("Failed to mark file as deleted:", err.Error())
 		} else {
-			// Send auto-delete notification
+			 
 			if err := h.discord.SendAutoDeleteNotification(file); err != nil {
 				println("Failed to send auto-delete notification:", err.Error())
 			}

@@ -5,25 +5,30 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{{.title}}</title>
     <link rel="stylesheet" href="/static/css/style.css">
+    <script src="https://unpkg.com/lucide@latest"></script>
 </head>
 <body>
+    <div class="grid-line v-line" style="left: 10%;"></div>
+    <div class="grid-line v-line" style="left: 90%;"></div>
+    <div class="grid-line h-line" style="top: 15%;"></div>
+
     <div class="container">
         <header>
-            <a href="/" class="logo-link">
-                <h1>🔒 SecureShare</h1>
-            </a>
-            <p class="subtitle">End-to-End Encrypted File Sharing</p>
+            <div class="space-y-1">
+                <h1><a href="/" style="text-decoration: none; color: inherit;">ShareIt</a></h1>
+                <p class="subtitle">End-to-End Encrypted File Sharing</p>
+            </div>
         </header>
 
-        <main>
+        <main style="padding: 3rem 1.5rem; max-width: 800px; margin: 0 auto;">
             <article class="legal-document">
                 <h1>Terms of Service</h1>
-                <p class="last-updated">Last updated: January 2025</p>
+                <p class="last-updated">Last updated: April 2026</p>
 
                 <section>
                     <h2>1. Acceptance of Terms</h2>
                     <p>
-                        By accessing or using SecureShare ("the Service"), you agree to be bound by these 
+                        By accessing or using ShareIt ("the Service"), you agree to be bound by these 
                         Terms of Service. If you do not agree to these terms, please do not use the Service.
                     </p>
                 </section>
@@ -31,7 +36,7 @@
                 <section>
                     <h2>2. Description of Service</h2>
                     <p>
-                        SecureShare provides end-to-end encrypted file sharing services. Files are encrypted 
+                        ShareIt provides end-to-end encrypted file sharing services. Files are encrypted 
                         in your browser before being uploaded to our servers. We do not have access to your 
                         encryption keys or the contents of your files.
                     </p>
@@ -94,7 +99,7 @@
                 <section>
                     <h2>8. Limitation of Liability</h2>
                     <p>
-                        IN NO EVENT SHALL SECURESHARE BE LIABLE FOR ANY INDIRECT, INCIDENTAL, SPECIAL, 
+                        IN NO EVENT SHALL SHAREIT BE LIABLE FOR ANY INDIRECT, INCIDENTAL, SPECIAL, 
                         CONSEQUENTIAL, OR PUNITIVE DAMAGES, INCLUDING LOSS OF DATA OR PROFITS.
                     </p>
                 </section>
@@ -124,12 +129,12 @@
             </article>
 
             <div class="back-link">
-                <a href="/" class="btn btn-secondary">← Back to Home</a>
+                <a href="/" class="btn btn-secondary">< Back to Home</a>
             </div>
         </main>
 
         <footer>
-            <p>SecureShare - End-to-End Encrypted File Sharing</p>
+            <p>Secured file sharing made easy. Powered by CNS</p>
         </footer>
     </div>
 </body>

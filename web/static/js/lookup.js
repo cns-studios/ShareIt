@@ -1,17 +1,12 @@
-/**
- * SecureShare Lookup Page
- * Handles file lookup by numeric code and decryption
- */
-
 (function() {
     'use strict';
 
-    // State
+     
     let fileMetadata = null;
     let encryptedBlob = null;
     let currentPassword = null;
 
-    // DOM Elements
+     
     const lookupSection = document.getElementById('lookup-section');
     const loadingSection = document.getElementById('loading-section');
     const resultSection = document.getElementById('result-section');
@@ -40,60 +35,51 @@
     const errorTitle = document.getElementById('error-title');
     const errorMessage = document.getElementById('error-message');
 
-    /**
-     * Initialize the page
-     */
     function init() {
         setupEventListeners();
         codeInput.focus();
     }
 
-    /**
-     * Set up event listeners
-     */
     function setupEventListeners() {
-        // Lookup button
+         
         lookupBtn.addEventListener('click', lookupFile);
 
-        // Code input - only allow digits
+         
         codeInput.addEventListener('input', (e) => {
             e.target.value = e.target.value.replace(/\D/g, '').slice(0, 12);
         });
 
-        // Code input enter key
+         
         codeInput.addEventListener('keypress', (e) => {
             if (e.key === 'Enter' && codeInput.value.length === 12) {
                 lookupFile();
             }
         });
 
-        // Download button
+         
         downloadBtn.addEventListener('click', () => {
             const password = passwordInput.value.trim().toLowerCase();
             downloadAndDecrypt(password);
         });
 
-        // Password input enter key
+         
         passwordInput.addEventListener('keypress', (e) => {
             if (e.key === 'Enter') {
                 downloadBtn.click();
             }
         });
 
-        // Navigation buttons
-        searchAnotherBtn.addEventListener('click', resetToLookup);
-        searchNewBtn.addEventListener('click', resetToLookup);
-        tryAgainBtn.addEventListener('click', handleTryAgain);
-        downloadAgainBtn.addEventListener('click', () => downloadAndDecrypt(currentPassword));
+         
+        if (searchAnotherBtn) searchAnotherBtn.addEventListener('click', resetToLookup);
+        if (searchNewBtn) searchNewBtn.addEventListener('click', resetToLookup);
+        if (tryAgainBtn) tryAgainBtn.addEventListener('click', handleTryAgain);
+        if (downloadAgainBtn) downloadAgainBtn.addEventListener('click', () => downloadAndDecrypt(currentPassword));
     }
 
-    /**
-     * Look up file by numeric code
-     */
     async function lookupFile() {
         const code = codeInput.value.trim();
 
-        // Validate code
+         
         if (code.length !== 12) {
             showError('Invalid Code', 'Please enter a 12-digit numeric code.');
             return;
@@ -104,7 +90,7 @@
             return;
         }
 
-        // Show loading
+         
         lookupSection.classList.add('hidden');
         errorSection.classList.add('hidden');
         loadingSection.classList.remove('hidden');
@@ -131,9 +117,6 @@
         }
     }
 
-    /**
-     * Display file metadata
-     */
     function displayFileMetadata() {
         fileNameEl.textContent = fileMetadata.original_name;
         fileSizeEl.textContent = SecureCrypto.formatFileSize(fileMetadata.size_bytes);
@@ -141,30 +124,27 @@
         fileExpiresEl.textContent = SecureCrypto.getTimeRemaining(fileMetadata.expires_at);
     }
 
-    /**
-     * Download and decrypt file
-     */
     async function downloadAndDecrypt(password) {
-        // Validate password
+         
         const validation = SecureCrypto.validatePassword(password);
         if (!validation.valid) {
-            showError('Invalid Password', validation.error);
+            showError('Invalid Passcode', validation.error);
             return;
         }
 
         currentPassword = password;
 
-        // Show progress
+         
         progressSection.classList.remove('hidden');
         downloadBtn.disabled = true;
         passwordInput.disabled = true;
 
         try {
-            // Download encrypted file
-            updateProgress(0, 'Downloading encrypted file...');
+             
+            updateProgress(0, 'Downloading file...');
             encryptedBlob = await downloadEncryptedFile();
 
-            // Decrypt file
+             
             updateProgress(50, 'Decrypting file...');
             const decryptedData = await SecureCrypto.decryptBlob(
                 encryptedBlob,
@@ -174,33 +154,30 @@
                 }
             );
 
-            // Trigger download
+             
             updateProgress(95, 'Preparing download...');
             triggerDownload(decryptedData, fileMetadata.original_name);
 
             updateProgress(100, 'Complete!');
 
-            // Show success
+             
             resultSection.classList.add('hidden');
             successSection.classList.remove('hidden');
 
         } catch (error) {
-            console.error('Download/decrypt failed:', error);
+            console.error('Something failed:', error);
             progressSection.classList.add('hidden');
             downloadBtn.disabled = false;
             passwordInput.disabled = false;
 
             if (error.message.includes('Decryption failed')) {
-                showInlineError('Invalid password. Please check and try again.');
+                showInlineError('Invalid passcode. Please check and try again.');
             } else {
                 showError('Download Failed', error.message);
             }
         }
     }
 
-    /**
-     * Download encrypted file from server
-     */
     async function downloadEncryptedFile() {
         const response = await fetch(`/api/file/${fileMetadata.id}/download`);
 
@@ -232,9 +209,6 @@
         return new Blob(chunks);
     }
 
-    /**
-     * Trigger file download
-     */
     function triggerDownload(data, filename) {
         const blob = new Blob([data], { type: 'application/octet-stream' });
         const url = URL.createObjectURL(blob);
@@ -253,9 +227,6 @@
         }, 100);
     }
 
-    /**
-     * Handle API errors
-     */
     function handleAPIError(error) {
         loadingSection.classList.add('hidden');
 
@@ -277,9 +248,6 @@
         }
     }
 
-    /**
-     * Show error page
-     */
     function showError(title, message) {
         errorTitle.textContent = title;
         errorMessage.textContent = message;
@@ -291,9 +259,6 @@
         errorSection.classList.remove('hidden');
     }
 
-    /**
-     * Show inline error (toast)
-     */
     function showInlineError(message) {
         const existingToast = document.querySelector('.toast');
         if (existingToast) {
@@ -324,9 +289,6 @@
         }, 4000);
     }
 
-    /**
-     * Reset to lookup
-     */
     function resetToLookup() {
         fileMetadata = null;
         encryptedBlob = null;
@@ -348,27 +310,21 @@
         codeInput.focus();
     }
 
-    /**
-     * Handle try again
-     */
     function handleTryAgain() {
         errorSection.classList.add('hidden');
         
-        // If we have metadata, go back to password entry
+         
         if (fileMetadata) {
             resultSection.classList.remove('hidden');
             passwordInput.value = '';
             passwordInput.focus();
         } else {
-            // Otherwise, go back to code entry
+             
             lookupSection.classList.remove('hidden');
             codeInput.focus();
         }
     }
 
-    /**
-     * Update progress
-     */
     function updateProgress(percent, text) {
         progressFill.style.width = `${percent}%`;
         if (text) {
@@ -376,7 +332,7 @@
         }
     }
 
-    // Initialize
+     
     if (document.readyState === 'loading') {
         document.addEventListener('DOMContentLoaded', init);
     } else {

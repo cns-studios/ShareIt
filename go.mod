@@ -1,4 +1,4 @@
-module secureshare
+module shareit
 
 go 1.22
 

@@ -5,126 +5,212 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{{.title}}</title>
     <link rel="stylesheet" href="/static/css/style.css">
+    <script src="https://unpkg.com/lucide@latest"></script>
 </head>
 <body>
+    <div class="grid-line v-line" style="left: 10%;"></div>
+    <div class="grid-line v-line" style="left: 90%;"></div>
+    <div class="grid-line h-line" style="top: 15%;"></div>
+
+    <div id="error-banner" class="error-banner hidden">
+        <div class="error-banner-content">
+            <span id="error-banner-text" class="error-banner-text"></span>
+            <button id="error-banner-close" class="error-banner-close" title="Close">
+                <i data-lucide="x" style="width: 1rem; height: 1rem;"></i>
+            </button>
+        </div>
+    </div>
+
     <div class="container">
         <header>
-            <h1>🔒 SecureShare</h1>
-            <p class="subtitle">End-to-End Encrypted File Sharing</p>
+            <div class="space-y-1">
+                <h1>ShareIt</h1>
+                <p class="subtitle">End-to-End Encrypted File Sharing</p>
+            </div>
         </header>
 
         <main>
-            <div id="upload-section">
-                <div id="drop-zone" class="drop-zone">
-                    <div class="drop-zone-content">
-                        <span class="drop-icon">📁</span>
-                        <p>Drag & drop a file here</p>
-                        <p class="small">or click to select</p>
-                        <p class="small">Max size: 750 MB</p>
+            <div class="left-column">
+                <h2 class="serif reveal-text" style="font-size: 4rem; line-height: 0.85; margin-bottom: 3rem;">
+                    Privacy is <br> 
+                    <span style="color: var(--accent);">Absolute.</span>
+                </h2>
+                
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 2rem; max-width: 700px; color: #555; font-size: 0.9rem;">
+                    <div style="border-top: 1px solid #333; padding-top: 1.5rem;">
+                        <span class="mono" style="font-size: 0.625rem; color: var(--accent); text-transform: uppercase;">01 // LIMITS</span>
+                        <p style="margin-top: 1rem; line-height: 1.6;">Upload what you need, when you need it.</p>
                     </div>
-                    <input type="file" id="file-input" hidden>
-                </div>
-
-                <div id="file-info" class="hidden">
-                    <div class="file-details">
-                        <span class="file-icon">📄</span>
-                        <div class="file-meta">
-                            <p id="file-name" class="file-name"></p>
-                            <p id="file-size" class="file-size"></p>
-                        </div>
-                        <button id="remove-file" class="btn-icon" title="Remove file">✕</button>
+                    <div style="border-top: 1px solid #333; padding-top: 1.5rem;">
+                        <span class="mono" style="font-size: 0.625rem; color: var(--accent); text-transform: uppercase;">02 // ENCRYPTION</span>
+                        <p style="margin-top: 1rem; line-height: 1.6;">AES-256-GCM encryption executed locally within your device's sandbox.</p>
                     </div>
-                </div>
-
-                <div id="progress-section" class="hidden">
-                    <div class="progress-container">
-                        <div class="progress-bar">
-                            <div id="progress-fill" class="progress-fill"></div>
-                        </div>
-                        <p id="progress-text" class="progress-text">Encrypting...</p>
-                    </div>
-                </div>
-
-                <div id="options-section" class="hidden">
-                    <div class="option-group">
-                        <label for="duration">Share Duration:</label>
-                        <select id="duration">
-                            <option value="24h">24 Hours</option>
-                            <option value="7d" selected>7 Days</option>
-                            <option value="30d">30 Days</option>
-                            <option value="90d">3 Months</option>
-                        </select>
-                    </div>
-
-                    <div class="option-group checkbox-group">
-                        <input type="checkbox" id="agree-tos">
-                        <label for="agree-tos">
-                            I agree to the <a href="/tos" target="_blank">Terms of Service</a> 
-                            and <a href="/privacy" target="_blank">Privacy Policy</a>
-                        </label>
-                    </div>
-
-                    <button id="upload-btn" class="btn btn-primary" disabled>
-                        Upload Encrypted File
-                    </button>
                 </div>
             </div>
 
-            <div id="result-section" class="hidden">
-                <div class="success-box">
-                    <span class="success-icon">✅</span>
-                    <h2>File Uploaded Successfully!</h2>
-                    
-                    <div class="result-group">
-                        <label>Share Link (copied to clipboard):</label>
-                        <div class="copy-field">
-                            <input type="text" id="share-link" readonly>
-                            <button id="copy-link" class="btn-icon" title="Copy link">📋</button>
+            <div class="right-column">
+                <div class="vault-card">
+                    <div class="vault-card-label">
+                        Status: <span id="status-text" class="status-indicator">Ready</span>
+                    </div>
+
+                    <div id="stage-entry" class="form-section">
+                        <div id="drop-zone" class="drop-zone">
+                            <input type="file" id="file-input" class="hidden">
+                            <i data-lucide="circle-fading-arrow-up" class="drop-zone-icon"></i>
+                            <h3>Upload File</h3>
+                            <p>Drag and Drop a file here or click to browse.</p>
+                        </div>
+
+                        <div id="file-details" class="hidden">
+                            <div class="file-details-box">
+                                <div class="file-icon-box">
+                                    <i data-lucide="file-digit" class="file-icon"></i>
+                                </div>
+                                <div class="file-meta-container">
+                                    <span id="file-name" class="file-name">payload.bin</span>
+                                    <span id="file-size" class="file-size">Processing file...</span>
+                                </div>
+                                <button id="reset-vault" class="btn-icon" style="color: #555; transition: color 0.3s;">
+                                    <i data-lucide="x" style="width: 1rem; height: 1rem;"></i>
+                                </button>
+                            </div>
+                            
+                            <div style="margin-top: 2rem; display: flex; flex-direction: column; gap: 1rem;">
+                                <p class="info-text">
+                                    File is encrypted client-side and uploaded to our servers.
+                                </p>
+                                <button id="start-over-btn" class="btn btn-secondary btn-large">
+                                    Choose Another File
+                                </button>
+                            </div>
                         </div>
                     </div>
 
-                    <div class="result-group">
-                        <label>Numeric Code:</label>
-                        <div class="copy-field">
-                            <input type="text" id="numeric-code" readonly>
-                            <button id="copy-code" class="btn-icon" title="Copy code">📋</button>
+                    <div id="stage-processing" class="hidden processing-container">
+                        <div class="scanner absolute inset-0 pointer-events-none opacity-20" style="position: absolute; top: -100%; width: 100%; height: 100%; opacity: 0.2;"></div>
+                        <div class="spinner-container">
+                            <div class="spinner-outer">
+                                <div class="spinner-inner"></div>
+                            </div>
+                            <div class="progress-text-container" id="progress-val">
+                                0%
+                            </div>
+                        </div>
+                        <div class="progress-label">
+                            <p id="process-sub" class="progress-sub">Scrambling data using passcode</p>
+                            <h4 class="progress-main" id="process-main">Encrypting...</h4>
                         </div>
                     </div>
 
-                    <div class="result-group">
-                        <label>Password (5 words):</label>
-                        <div class="copy-field">
-                            <input type="text" id="password-words" readonly>
-                            <button id="copy-password" class="btn-icon" title="Copy password">📋</button>
+                    <div id="stage-pending" class="hidden form-section">
+                        <div class="output-header">
+                            <div class="success-badge">
+                                Start your Upload
+                            </div>
                         </div>
+
+                        <p class="info-text">
+                            Select expiration and accept our Terms of Service to share this file.
+                        </p>
+
+                        <div class="form-group">
+                            <label class="form-label">Expiration</label>
+                            <div class="expiration-options">
+                                <label class="duration-option">
+                                    <input type="radio" name="expiration" value="24h" checked>
+                                    <span>24 hours</span>
+                                </label>
+                                <label class="duration-option">
+                                    <input type="radio" name="expiration" value="7d">
+                                    <span>7 days</span>
+                                </label>
+                                <label class="duration-option">
+                                    <input type="radio" name="expiration" value="30d">
+                                    <span>30 days</span>
+                                </label>
+                                <label class="duration-option">
+                                    <input type="radio" name="expiration" value="90d">
+                                    <span>3 months</span>
+                                </label>
+                            </div>
+                        </div>
+
+                        <div class="checkbox-wrapper">
+                            <input type="checkbox" id="tos-check">
+                            <label for="tos-check" class="checkbox-label">
+                                I agree to the <a href="/tos" target="_blank" rel="noopener">Terms of Service</a>.
+                            </label>
+                        </div>
+
+                        <div class="info-box" style="margin-top: 0;">
+                            <p class="info-text">
+                                Upload your file, session expires in <span id="pending-countdown">10:00</span>.
+                            </p>
+                        </div>
+
+                        <button id="finalize-btn" class="btn-accent btn-large" disabled>
+                            Upload
+                        </button>
                     </div>
 
-                    <p class="warning">
-                        ⚠️ Save the password! Without it, the file cannot be decrypted.
-                    </p>
+                    <div id="stage-output" class="hidden form-section">
+                        <div class="output-header">
+                            <div class="success-badge">
+                                Success!
+                            </div>
+                        </div>
 
-                    <button id="upload-another" class="btn btn-secondary">
-                        Upload Another File
-                    </button>
-                </div>
-            </div>
+                        <div style="display: flex; flex-direction: column; gap: 1rem;">
+                            <div class="form-group">
+                                <label class="form-label">Sharing Link</label>
+                                <div class="form-input-wrapper">
+                                    <input id="out-url" readonly type="text" class="form-input" value="SILENCE.STORAGE/X-992">
+                                    <button class="copy-trigger" title="Copy to clipboard">
+                                        <i data-lucide="copy" style="width: 1rem; height: 1rem;"></i>
+                                    </button>
+                                </div>
+                            </div>
 
-            <div id="error-section" class="hidden">
-                <div class="error-box">
-                    <span class="error-icon">❌</span>
-                    <h2>Upload Failed</h2>
-                    <p id="error-message"></p>
-                    <button id="try-again" class="btn btn-secondary">
-                        Try Again
-                    </button>
+                            <div class="two-column-grid">
+                                <div class="form-group">
+                                    <label class="form-label">Lookup Code</label>
+                                    <input id="out-pin" readonly type="text" class="fancy-input" value="992-001">
+                                </div>
+                                <div class="form-group">
+                                    <label class="form-label">Decryption Key</label>
+                                    <input id="out-key" readonly type="text" class="fancy-input" value="void-echo-zero">
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="info-box">
+                            <p id="out-expiry-label" class="info-text">Storage policy active.</p>
+
+                        </div>
+                        <div class="info-box" style="margin-top: 1rem; background: #181818; border-radius: 4px; border: 1px solid var(--border); color: var(--accent); text-align: center;">
+                            <strong>Note:</strong> To access this file later, you will need either the sharing link or the Lookup Code & Passcode shown above. Keep them safe!
+                        </div>
+                        <button onclick="location.reload()" class="btn btn-secondary btn-large" style="margin-top: auto;">
+                            Start over
+                        </button>
+                    </div>
                 </div>
             </div>
         </main>
 
-        <footer>
-            <p>Files are encrypted in your browser before upload.</p>
-            <p>We never see your encryption keys.</p>
-        </footer>
+    </div>
+
+    <footer>
+        <p> Secured file sharing made easy. Powered by CNS</p>
+    </footer>
+
+    <div id="share-banner" class="share-banner hidden">
+        <span class="share-banner-title">Link Copied!</span>
+        <span class="share-banner-message">Your sharing link has been copied to the clipboard.</span>
+        <button id="close-share-banner" class="share-banner-close" title="Close">
+            <i data-lucide="x" style="width: 1rem; height: 1rem;"></i>
+        </button>
     </div>
 
     <script>
@@ -132,6 +218,16 @@
             baseURL: "{{.baseURL}}",
             maxFileSize: {{.maxFileSize}}
         };
+    </script>
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <script>
+        document.addEventListener("DOMContentLoaded", function() {
+            if (window.lucide && lucide.createIcons) {
+                lucide.createIcons();
+            } else if (window.lucide && lucide.replace) {
+                lucide.replace();
+            }
+        });
     </script>
     <script src="/static/js/crypto.js"></script>
     <script src="/static/js/app.js"></script>

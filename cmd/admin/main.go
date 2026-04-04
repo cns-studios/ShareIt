@@ -7,9 +7,9 @@ import (
 	"strings"
 	"time"
 
-	"secureshare/internal/config"
-	"secureshare/internal/services"
-	"secureshare/internal/storage"
+	"shareit/internal/config"
+	"shareit/internal/services"
+	"shareit/internal/storage"
 )
 
 func main() {
@@ -18,14 +18,12 @@ func main() {
 		os.Exit(1)
 	}
 
-	// Load configuration
 	cfg, err := config.Load()
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Error loading configuration: %v\n", err)
 		os.Exit(1)
 	}
 
-	// Initialize PostgreSQL
 	db, err := storage.NewPostgres(cfg)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Error connecting to PostgreSQL: %v\n", err)
@@ -33,14 +31,12 @@ func main() {
 	}
 	defer db.Close()
 
-	// Initialize filesystem
 	fs, err := storage.NewFilesystem(cfg)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Error initializing filesystem: %v\n", err)
 		os.Exit(1)
 	}
 
-	// Initialize Discord
 	discord := services.NewDiscord(cfg)
 
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
@@ -110,7 +106,7 @@ func main() {
 
 func printUsage() {
 	usage := `
-SecureShare Admin CLI
+ShareIt Admin CLI
 
 Usage: admin <command> [arguments]
 
@@ -165,59 +161,59 @@ func viewFile(ctx context.Context, db *storage.Postgres, fs *storage.Filesystem,
 	fmt.Printf("Is Deleted:    %t\n", file.IsDeleted)
 	fmt.Println(strings.Repeat("=", 60))
 
-	// Send to Discord if configured
+	 
 	if err := discord.SendAdminFileNotification(file, "view"); err != nil {
 		fmt.Printf("Warning: Failed to send Discord notification: %v\n", err)
 	}
 }
 
 func deleteFile(ctx context.Context, db *storage.Postgres, fs *storage.Filesystem, discord *services.Discord, fileID string) {
-	// Get file first
+	 
 	file, err := db.GetFileForAdmin(ctx, fileID)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Error getting file: %v\n", err)
 		os.Exit(1)
 	}
 
-	// Mark as deleted in database
+	 
 	if err := db.MarkFileDeleted(ctx, fileID); err != nil {
 		fmt.Fprintf(os.Stderr, "Error marking file as deleted: %v\n", err)
 		os.Exit(1)
 	}
 
-	// Delete from filesystem
+	 
 	if err := fs.DeleteFile(fileID); err != nil {
 		fmt.Printf("Warning: Error deleting file from disk: %v\n", err)
 	}
 
 	fmt.Printf("File %s has been deleted\n", fileID)
 
-	// Send to Discord
+	 
 	if err := discord.SendAdminFileNotification(file, "delete"); err != nil {
 		fmt.Printf("Warning: Failed to send Discord notification: %v\n", err)
 	}
 }
 
 func downloadFile(ctx context.Context, db *storage.Postgres, fs *storage.Filesystem, discord *services.Discord, fileID, outputPath string) {
-	// Get file metadata
+	 
 	file, err := db.GetFileForAdmin(ctx, fileID)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Error getting file: %v\n", err)
 		os.Exit(1)
 	}
 
-	// Check if file exists on disk
+	 
 	if !fs.FileExists(fileID) {
 		fmt.Fprintf(os.Stderr, "Error: File does not exist on disk\n")
 		os.Exit(1)
 	}
 
-	// Determine output path
+	 
 	if outputPath == "" {
 		outputPath = fmt.Sprintf("%s.enc", fileID)
 	}
 
-	// Open source file
+	 
 	reader, err := fs.GetFileReader(fileID)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Error opening file: %v\n", err)
@@ -225,7 +221,7 @@ func downloadFile(ctx context.Context, db *storage.Postgres, fs *storage.Filesys
 	}
 	defer reader.Close()
 
-	// Create output file
+	 
 	outFile, err := os.Create(outputPath)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Error creating output file: %v\n", err)
@@ -233,7 +229,7 @@ func downloadFile(ctx context.Context, db *storage.Postgres, fs *storage.Filesys
 	}
 	defer outFile.Close()
 
-	// Copy data
+	 
 	written, err := outFile.ReadFrom(reader)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Error writing file: %v\n", err)
@@ -244,7 +240,7 @@ func downloadFile(ctx context.Context, db *storage.Postgres, fs *storage.Filesys
 	fmt.Printf("Original filename: %s\n", file.OriginalName)
 	fmt.Println("Note: File is encrypted. You need the decryption password to view contents.")
 
-	// Send to Discord
+	 
 	if err := discord.SendAdminFileNotification(file, "download"); err != nil {
 		fmt.Printf("Warning: Failed to send Discord notification: %v\n", err)
 	}
@@ -347,7 +343,7 @@ func showReports(ctx context.Context, db *storage.Postgres, fileID string) {
 func forceCleanup(ctx context.Context, cfg *config.Config, db *storage.Postgres, fs *storage.Filesystem) {
 	fmt.Println("Starting forced cleanup...")
 
-	// Delete expired files from database
+	 
 	expiredCount, err := db.DeleteExpiredFiles(ctx)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Error deleting expired files: %v\n", err)
@@ -355,7 +351,7 @@ func forceCleanup(ctx context.Context, cfg *config.Config, db *storage.Postgres,
 		fmt.Printf("Marked %d expired files as deleted\n", expiredCount)
 	}
 
-	// Get all files marked as deleted
+	 
 	files, err := db.GetAllFiles(ctx, 1000, 0)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Error getting files: %v\n", err)
@@ -374,7 +370,7 @@ func forceCleanup(ctx context.Context, cfg *config.Config, db *storage.Postgres,
 	}
 	fmt.Printf("Deleted %d file blobs\n", deletedBlobs)
 
-	// Clean up orphaned chunks
+	 
 	orphanedCount, err := fs.CleanupOrphanedChunks(make(map[string]bool))
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Error cleaning orphaned chunks: %v\n", err)

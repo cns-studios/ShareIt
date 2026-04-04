@@ -6,8 +6,8 @@ import (
 	"sync"
 	"time"
 
-	"secureshare/internal/config"
-	"secureshare/internal/storage"
+	"shareit/internal/config"
+	"shareit/internal/storage"
 )
 
 type Cleanup struct {
@@ -29,13 +29,13 @@ func NewCleanup(cfg *config.Config, db *storage.Postgres, redis *storage.Redis, 
 	}
 }
 
-// Start begins the cleanup background service
+ 
 func (c *Cleanup) Start() {
 	c.wg.Add(1)
 	go c.run()
 }
 
-// Stop gracefully stops the cleanup service
+ 
 func (c *Cleanup) Stop() {
 	close(c.stopChan)
 	c.wg.Wait()
@@ -44,10 +44,10 @@ func (c *Cleanup) Stop() {
 func (c *Cleanup) run() {
 	defer c.wg.Done()
 
-	// Run cleanup immediately on start
+	 
 	c.performCleanup()
 
-	// Then run every 5 minutes
+	 
 	ticker := time.NewTicker(5 * time.Minute)
 	defer ticker.Stop()
 
@@ -68,7 +68,7 @@ func (c *Cleanup) performCleanup() {
 
 	log.Println("Starting cleanup cycle...")
 
-	// 1. Mark expired files as deleted in database
+	 
 	expiredCount, err := c.db.DeleteExpiredFiles(ctx)
 	if err != nil {
 		log.Printf("Error marking expired files as deleted: %v", err)
@@ -76,7 +76,7 @@ func (c *Cleanup) performCleanup() {
 		log.Printf("Marked %d expired files as deleted", expiredCount)
 	}
 
-	// 2. Get all files marked as deleted and remove their blobs
+	 
 	deletedFiles, err := c.getDeletedFiles(ctx)
 	if err != nil {
 		log.Printf("Error getting deleted files: %v", err)
@@ -91,7 +91,7 @@ func (c *Cleanup) performCleanup() {
 		}
 	}
 
-	// 3. Clean up orphaned chunks (chunks without active sessions)
+	 
 	orphanedCount, err := c.cleanupOrphanedChunks(ctx)
 	if err != nil {
 		log.Printf("Error cleaning up orphaned chunks: %v", err)
@@ -99,7 +99,7 @@ func (c *Cleanup) performCleanup() {
 		log.Printf("Cleaned up %d orphaned chunk directories", orphanedCount)
 	}
 
-	// 4. Clean up orphaned files (files on disk not in database)
+	 
 	orphanedFiles, err := c.cleanupOrphanedFiles(ctx)
 	if err != nil {
 		log.Printf("Error cleaning up orphaned files: %v", err)
@@ -110,9 +110,9 @@ func (c *Cleanup) performCleanup() {
 	log.Println("Cleanup cycle completed")
 }
 
-// getDeletedFiles returns IDs of files marked as deleted in database
+ 
 func (c *Cleanup) getDeletedFiles(ctx context.Context) ([]string, error) {
-	// Query files that are deleted but might still have blobs
+	 
 	files, err := c.db.GetDeletedFiles(ctx)
 	if err != nil {
 		return nil, err
@@ -128,27 +128,27 @@ func (c *Cleanup) getDeletedFiles(ctx context.Context) ([]string, error) {
 	return fileIDs, nil
 }
 
-// cleanupOrphanedChunks removes chunk directories without active upload sessions
+ 
 func (c *Cleanup) cleanupOrphanedChunks(ctx context.Context) (int, error) {
-	// Get active sessions from Redis
+	 
 	activeSessions, err := c.redis.GetAllActiveSessions(ctx)
 	if err != nil {
 		return 0, err
 	}
 
-	// Create a map for quick lookup
+	 
 	activeMap := make(map[string]bool)
 	for _, sessionID := range activeSessions {
 		activeMap[sessionID] = true
 	}
 
-	// Clean up chunks that don't have active sessions
+	 
 	return c.fs.CleanupOrphanedChunks(activeMap)
 }
 
-// cleanupOrphanedFiles removes files from disk that aren't tracked in database
+ 
 func (c *Cleanup) cleanupOrphanedFiles(ctx context.Context) (int, error) {
-	// Get all file IDs on disk
+	 
 	diskFiles, err := c.fs.GetAllFileIDs()
 	if err != nil {
 		return 0, err
@@ -156,10 +156,15 @@ func (c *Cleanup) cleanupOrphanedFiles(ctx context.Context) (int, error) {
 
 	cleaned := 0
 	for _, fileID := range diskFiles {
-		// Check if file exists in database (including deleted files)
+		 
 		_, err := c.db.GetFileForAdmin(ctx, fileID)
 		if err != nil {
-			// File not in database, it's orphaned
+			isPending, pendingErr := c.redis.IsFilePending(ctx, fileID)
+			if pendingErr == nil && isPending {
+				continue
+			}
+
+			 
 			if err := c.fs.DeleteFile(fileID); err != nil {
 				log.Printf("Error deleting orphaned file %s: %v", fileID, err)
 				continue
@@ -171,12 +176,12 @@ func (c *Cleanup) cleanupOrphanedFiles(ctx context.Context) (int, error) {
 	return cleaned, nil
 }
 
-// ForceCleanup runs cleanup immediately (for admin use)
+ 
 func (c *Cleanup) ForceCleanup() {
 	c.performCleanup()
 }
 
-// GetStats returns cleanup-related statistics
+ 
 func (c *Cleanup) GetStats(ctx context.Context) (map[string]interface{}, error) {
 	totalFiles, activeFiles, totalReports, totalSize, err := c.db.GetStats(ctx)
 	if err != nil {

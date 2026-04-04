@@ -1,55 +1,54 @@
-/**
- * SecureShare Upload Application
- * Handles file upload with client-side encryption
- */
-
 (function() {
     'use strict';
 
-    // Configuration
-    const CHUNK_SIZE = 5 * 1024 * 1024; // 5MB chunks
-    const MAX_FILE_SIZE = window.CONFIG?.maxFileSize || 786432000; // 750MB
+     
+    const CHUNK_SIZE = 5 * 1024 * 1024;  
+    const MAX_FILE_SIZE = window.CONFIG?.maxFileSize || 786432000;  
 
-    // State
+     
     let selectedFile = null;
     let encryptedBlob = null;
     let generatedPassword = null;
     let uploadSessionId = null;
+    let pendingExpiresAt = null;
+    let pendingCountdownTimer = null;
     let isUploading = false;
-    let isEncrypting = false;
+    let isFinalizing = false;
+    let uploadComplete = false;
+    let uploadError = null;
 
-    // DOM Elements
+     
     const dropZone = document.getElementById('drop-zone');
     const fileInput = document.getElementById('file-input');
-    const fileInfo = document.getElementById('file-info');
+    const fileDetails = document.getElementById('file-details');
     const fileName = document.getElementById('file-name');
     const fileSize = document.getElementById('file-size');
-    const removeFileBtn = document.getElementById('remove-file');
-    const progressSection = document.getElementById('progress-section');
-    const progressFill = document.getElementById('progress-fill');
-    const progressText = document.getElementById('progress-text');
-    const optionsSection = document.getElementById('options-section');
-    const durationSelect = document.getElementById('duration');
-    const agreeTosCheckbox = document.getElementById('agree-tos');
-    const uploadBtn = document.getElementById('upload-btn');
-    const uploadSection = document.getElementById('upload-section');
-    const resultSection = document.getElementById('result-section');
-    const errorSection = document.getElementById('error-section');
-    const shareLink = document.getElementById('share-link');
-    const numericCode = document.getElementById('numeric-code');
-    const passwordWords = document.getElementById('password-words');
-    const copyLinkBtn = document.getElementById('copy-link');
-    const copyCodeBtn = document.getElementById('copy-code');
-    const copyPasswordBtn = document.getElementById('copy-password');
-    const uploadAnotherBtn = document.getElementById('upload-another');
-    const tryAgainBtn = document.getElementById('try-again');
-    const errorMessage = document.getElementById('error-message');
+    const resetVault = document.getElementById('reset-vault');
+    const startOverBtn = document.getElementById('start-over-btn');
+    const tosCheck = document.getElementById('tos-check');
+    const finalizeBtn = document.getElementById('finalize-btn');
+    const statusText = document.getElementById('status-text');
+    const errorBanner = document.getElementById('error-banner');
+    const errorBannerText = document.getElementById('error-banner-text');
+    const errorBannerClose = document.getElementById('error-banner-close');
 
-    /**
-     * Initialize the application
-     */
+    const stageEntry = document.getElementById('stage-entry');
+    const stageProcessing = document.getElementById('stage-processing');
+    const stagePending = document.getElementById('stage-pending');
+    const stageOutput = document.getElementById('stage-output');
+    const pendingCountdown = document.getElementById('pending-countdown');
+    
+    const progressVal = document.getElementById('progress-val');
+    const processMain = document.getElementById('process-main');
+    const processSub = document.getElementById('process-sub');
+
+    const outUrl = document.getElementById('out-url');
+    const outPin = document.getElementById('out-pin');
+    const outKey = document.getElementById('out-key');
+    const outExpiryLabel = document.getElementById('out-expiry-label');
+
     async function init() {
-        // Preload word list
+         
         try {
             await SecureCrypto.loadWordList();
         } catch (error) {
@@ -59,64 +58,71 @@
         setupEventListeners();
     }
 
-    /**
-     * Set up event listeners
-     */
     function setupEventListeners() {
-        // Drop zone events
+         
         dropZone.addEventListener('click', () => fileInput.click());
         dropZone.addEventListener('dragover', handleDragOver);
         dropZone.addEventListener('dragleave', handleDragLeave);
         dropZone.addEventListener('drop', handleDrop);
         fileInput.addEventListener('change', handleFileSelect);
 
-        // Remove file button
-        removeFileBtn.addEventListener('click', (e) => {
+         
+        resetVault.addEventListener('click', (e) => {
             e.stopPropagation();
             resetUpload();
         });
+        startOverBtn.addEventListener('click', () => resetUpload());
+        tosCheck.addEventListener('change', updateFinalizeButtonState);
+        finalizeBtn.addEventListener('click', handleFinalize);
 
-        // ToS checkbox
-        agreeTosCheckbox.addEventListener('change', updateUploadButtonState);
+         
+        document.querySelectorAll('.copy-trigger').forEach(btn => {
+            btn.addEventListener('click', function() {
+                const input = this.parentElement.querySelector('input');
+                copyToClipboard(input.value);
+                const original = this.innerHTML;
+                this.innerHTML = '<i data-lucide="check" style="width: 1rem; height: 1rem;"></i>';
+                this.style.background = 'var(--accent)';
+                this.style.color = '#000';
+                lucide.createIcons();
+                setTimeout(() => {
+                    this.innerHTML = original;
+                    this.style.background = 'transparent';
+                    this.style.color = 'inherit';
+                    lucide.createIcons();
+                }, 2000);
+            });
+        });
 
-        // Upload button
-        uploadBtn.addEventListener('click', handleUpload);
+        document.querySelectorAll('input[name="expiration"]').forEach(input => {
+            input.addEventListener('change', updateFinalizeButtonState);
+        });
 
-        // Copy buttons
-        copyLinkBtn.addEventListener('click', () => copyToClipboard(shareLink.value, 'Link'));
-        copyCodeBtn.addEventListener('click', () => copyToClipboard(numericCode.value, 'Code'));
-        copyPasswordBtn.addEventListener('click', () => copyToClipboard(passwordWords.value, 'Password'));
-
-        // Reset buttons
-        uploadAnotherBtn.addEventListener('click', resetAll);
-        tryAgainBtn.addEventListener('click', resetAll);
+        if (errorBannerClose) {
+            errorBannerClose.addEventListener('click', hideErrorBanner);
+        }
     }
 
-    /**
-     * Handle drag over event
-     */
     function handleDragOver(e) {
         e.preventDefault();
         e.stopPropagation();
-        dropZone.classList.add('drag-over');
+        e.dataTransfer.dropEffect = 'copy';
+        dropZone.classList.add('active');
     }
 
-    /**
-     * Handle drag leave event
-     */
     function handleDragLeave(e) {
         e.preventDefault();
         e.stopPropagation();
-        dropZone.classList.remove('drag-over');
+         
+        if (e.target === dropZone) {
+            dropZone.classList.remove('active');
+        }
     }
 
-    /**
-     * Handle drop event
-     */
     function handleDrop(e) {
         e.preventDefault();
         e.stopPropagation();
-        dropZone.classList.remove('drag-over');
+        dropZone.classList.remove('active');
 
         const files = e.dataTransfer.files;
         if (files.length > 0) {
@@ -124,9 +130,6 @@
         }
     }
 
-    /**
-     * Handle file input change
-     */
     function handleFileSelect(e) {
         const files = e.target.files;
         if (files.length > 0) {
@@ -134,101 +137,144 @@
         }
     }
 
-    /**
-     * Process selected file
-     */
     async function processFile(file) {
-        // Validate file size
+        if (isUploading || isFinalizing) {
+            return;
+        }
+
+         
         if (file.size > MAX_FILE_SIZE) {
-            showError(`File too large. Maximum size is ${SecureCrypto.formatFileSize(MAX_FILE_SIZE)}`);
+            showErrorBanner(`File too large. Maximum size is ${SecureCrypto.formatFileSize(MAX_FILE_SIZE)}`);
             return;
         }
 
         if (file.size === 0) {
-            showError('Cannot upload empty file');
+            showErrorBanner('Cannot upload empty file');
             return;
         }
 
         selectedFile = file;
 
-        // Update UI
+         
         fileName.textContent = file.name;
         fileSize.textContent = SecureCrypto.formatFileSize(file.size);
         dropZone.classList.add('hidden');
-        fileInfo.classList.remove('hidden');
-        optionsSection.classList.remove('hidden');
-        progressSection.classList.remove('hidden');
+        fileDetails.classList.remove('hidden');
+        statusText.textContent = 'Preparing Upload';
+        statusText.style.color = 'white';
 
-        // Start encryption immediately
-        await startEncryption();
+         
+        dropZone.classList.add('hidden');
+        fileDetails.classList.remove('hidden');
+        stageEntry.classList.add('hidden');
+        stageProcessing.classList.add('hidden');
+        stagePending.classList.remove('hidden');
+        stageOutput.classList.add('hidden');
+        statusText.textContent = 'Processing...';
+        statusText.style.color = 'white';
+        tosCheck.checked = false;
+        updateFinalizeButtonState();
+
+         
+        runProtocolInBackground();
     }
 
-    /**
-     * Start file encryption
-     */
-    async function startEncryption() {
-        if (isEncrypting || !selectedFile) return;
+    function handleFinalize() {
+        if (!uploadSessionId || isFinalizing || !tosCheck.checked) {
+            return;
+        }
+        finalizeUpload();
+    }
 
-        isEncrypting = true;
-        updateProgress(0, 'Generating encryption key...');
+    function updateFinalizeButtonState() {
+        finalizeBtn.disabled = !uploadSessionId || !tosCheck.checked || isFinalizing;
+    }
 
+    async function runProtocolInBackground() {
+        isUploading = true;
+        uploadComplete = false;
+        uploadError = null;
+        
         try {
-            // Generate password
+             
             generatedPassword = await SecureCrypto.generatePassword();
-            updateProgress(10, 'Encrypting file...');
 
-            // Encrypt file
+             
+            encryptedBlob = await SecureCrypto.encryptFile(
+                selectedFile,
+                generatedPassword,
+                () => {}  
+            );
+
+             
+            await startUploadInBackground();
+            uploadComplete = true;
+            
+        } catch (error) {
+            console.error('Something failed:', error);
+            uploadError = error.message;
+            isUploading = false;
+            hideErrorBanner();
+            showErrorBanner('Something failed: ' + error.message);
+        }
+    }
+
+    async function runProtocol() {
+        stageEntry.classList.add('hidden');
+        stagePending.classList.add('hidden');
+        stageOutput.classList.add('hidden');
+        stageProcessing.classList.remove('hidden');
+        statusText.textContent = 'Encrypting...';
+        
+        try {
+             
+            generatedPassword = await SecureCrypto.generatePassword();
+            updateProgress(0, 'Scrambling data', 'Encrypting...');
+
+             
             encryptedBlob = await SecureCrypto.encryptFile(
                 selectedFile,
                 generatedPassword,
                 (progress, status) => {
-                    updateProgress(10 + (progress * 0.4), status);
+                    updateProgress(progress * 0.5, status, 'Encrypting...');
                 }
             );
 
-            updateProgress(50, 'Encrypting complete. Uploading...');
-            isEncrypting = false;
+            updateProgress(50, 'Up to the clouds', 'Uploading...');
 
+             
             await startUpload();
             
         } catch (error) {
-            console.error('Encryption failed:', error);
-            showError('Encryption failed: ' + error.message);
-            isEncrypting = false;
+            console.error('Something failed:', error);
+            showErrorBanner('Something failed: ' + error.message);
         }
     }
 
-    /**
-     * Update upload button state
-     */
-    function updateUploadButtonState() {
-        uploadBtn.disabled = !agreeTosCheckbox.checked || !uploadReady;
-    }
+    async function startUploadInBackground() {
+        if (!encryptedBlob) return;
 
-    /**
-     * Handle upload button click
-     */
-    function handleUpload() {
-        if (!uploadReady || !agreeTosCheckbox.checked) return;
-        confirmUpload();
-    }
-
-    async function confirmUpload() {
-        uploadBtn.disabled = true;
         try {
+             
+            const initResponse = await initUpload();
+            uploadSessionId = initResponse.session_id;
+
+             
+            await uploadChunksInBackground(initResponse);
+
+             
             const completeResponse = await completeUpload();
-            showSuccess(completeResponse);
+             
+            pendingExpiresAt = completeResponse.pending_expires_at ? new Date(completeResponse.pending_expires_at).getTime() : null;
+            statusText.textContent = 'Pending Finalization';
+            statusText.style.color = 'var(--accent)';
+            startPendingCountdown();
         } catch (error) {
-            console.error('Complete failed:', error);
-            showError('Failed to finalize upload: ' + error.message);
-            uploadBtn.disabled = false;
+            console.error('Background upload failed:', error);
+            uploadError = error.message;
+            isUploading = false;
         }
     }
-
-    /**
-     * Start the upload process
-     */
-    let uploadReady = false;
 
     async function startUpload() {
         if (isUploading || !encryptedBlob) return;
@@ -236,23 +282,21 @@
         isUploading = true;
 
         try {
-            // Initialize upload session
+             
             const initResponse = await initUpload();
             uploadSessionId = initResponse.session_id;
 
-            // Upload chunks
+             
             await uploadChunks(initResponse);
 
-            // Complete upload
-            // Chunks uploaded, now wait for ToS ack
-            updateProgress(100, 'Ready. Accept terms to get your share link.');
-            uploadReady = true;
-            isUploading = false;
-            updateUploadButtonState();
+             
+            const completeResponse = await completeUpload();
+            showPending(completeResponse);
+            
         } catch (error) {
             console.error('Upload failed:', error);
             
-            // Cancel the upload session if it exists
+             
             if (uploadSessionId) {
                 try {
                     await cancelUpload();
@@ -261,15 +305,38 @@
                 }
             }
 
-            showError('Upload failed: ' + error.message)
-            isUploading = false;
-            uploadReady = false;
+            showErrorBanner('Upload failed: ' + error.message);
+            resetUpload();
+        }
+
+        isUploading = false;
+    }
+
+    async function uploadChunksInBackground(initResponse) {
+        const totalChunks = initResponse.total_chunks;
+
+        for (let i = 0; i < totalChunks; i++) {
+            const start = i * CHUNK_SIZE;
+            const end = Math.min(start + CHUNK_SIZE, encryptedBlob.size);
+            const chunk = encryptedBlob.slice(start, end);
+
+            const formData = new FormData();
+            formData.append('session_id', initResponse.session_id);
+            formData.append('chunk_index', i.toString());
+            formData.append('chunk', chunk);
+
+            const response = await fetch('/api/upload/chunk', {
+                method: 'POST',
+                body: formData
+            });
+
+            if (!response.ok) {
+                const error = await response.json();
+                throw new Error(error.error || `Failed to upload chunk ${i + 1}`);
+            }
         }
     }
 
-    /**
-     * Initialize upload session
-     */
     async function initUpload() {
         const totalChunks = Math.ceil(encryptedBlob.size / CHUNK_SIZE);
 
@@ -282,8 +349,7 @@
                 file_name: selectedFile.name,
                 file_size: encryptedBlob.size,
                 total_chunks: totalChunks,
-                chunk_size: CHUNK_SIZE,
-                duration: durationSelect.value
+                chunk_size: CHUNK_SIZE
             })
         });
 
@@ -295,9 +361,30 @@
         return response.json();
     }
 
-    /**
-     * Upload file chunks
-     */
+    async function initUpload() {
+        const totalChunks = Math.ceil(encryptedBlob.size / CHUNK_SIZE);
+
+        const response = await fetch('/api/upload/init', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                file_name: selectedFile.name,
+                file_size: encryptedBlob.size,
+                total_chunks: totalChunks,
+                chunk_size: CHUNK_SIZE
+            })
+        });
+
+        if (!response.ok) {
+            const error = await response.json();
+            throw new Error(error.error || 'Failed to initialize upload');
+        }
+
+        return response.json();
+    }
+
     async function uploadChunks(initResponse) {
         const totalChunks = initResponse.total_chunks;
         let uploadedChunks = 0;
@@ -319,20 +406,17 @@
 
             if (!response.ok) {
                 const error = await response.json();
-                throw new Error(error.error || `Failed to upload chunk ${i + 1}`);
+                throw new Error(error.error || `Failed to upload ${i + 1}`);
             }
 
             uploadedChunks++;
             const progress = 50 + (uploadedChunks / totalChunks) * 45;
-            updateProgress(progress, `Uploading... ${uploadedChunks}/${totalChunks} chunks`);
+            updateProgress(progress, `Sending it high to the clouds`, 'Uploading...');
         }
     }
 
-    /**
-     * Complete the upload
-     */
     async function completeUpload() {
-        updateProgress(95, 'Finalizing upload...');
+        updateProgress(95, 'Making sure everything is okay', 'Finalizing...');
 
         const response = await fetch('/api/upload/complete', {
             method: 'POST',
@@ -350,13 +434,104 @@
             throw new Error(error.error || 'Failed to complete upload');
         }
 
-        updateProgress(100, 'Upload complete!');
+        updateProgress(100, 'Yippe', 'Complete!');
         return response.json();
     }
 
-    /**
-     * Cancel upload session
-     */
+    function showPendingUI() {
+        hideErrorBanner();
+        stageEntry.classList.add('hidden');
+        stageProcessing.classList.add('hidden');
+        stagePending.classList.remove('hidden');
+        stageOutput.classList.add('hidden');
+        statusText.textContent = uploadError ? 'Upload Failed' : 'Pending Finalization';
+        statusText.style.color = uploadError ? '#f44336' : 'var(--accent)';
+        tosCheck.checked = false;
+        updateFinalizeButtonState();
+    }
+
+    function showPending(response) {
+        uploadSessionId = response.session_id;
+        pendingExpiresAt = response.pending_expires_at ? new Date(response.pending_expires_at).getTime() : null;
+        showPendingUI();
+        startPendingCountdown();
+    }
+
+    function selectedDuration() {
+        const checked = document.querySelector('input[name="expiration"]:checked');
+        return checked ? checked.value : '24h';
+    }
+
+    function selectedDurationLabel() {
+        const duration = selectedDuration();
+        switch(duration) {
+            case '24h': return '24 Hours';
+            case '7d': return '7 Days';
+            case '30d': return '30 Days';
+            case '90d': return '3 Months';
+            default: return '24 Hours';
+        }
+    }
+
+    async function finalizeUpload() {
+        isFinalizing = true;
+        updateFinalizeButtonState();
+        
+         
+        if (isUploading && !uploadComplete) {
+            stageEntry.classList.add('hidden');
+            stagePending.classList.add('hidden');
+            stageOutput.classList.add('hidden');
+            stageProcessing.classList.remove('hidden');
+            statusText.textContent = 'Completing Upload';
+            
+            const maxWaitTime = 60000;  
+            const startTime = Date.now();
+            while (isUploading && !uploadComplete && Date.now() - startTime < maxWaitTime) {
+                await new Promise(resolve => setTimeout(resolve, 500));
+            }
+            
+            if (uploadError) {
+                showErrorBanner('Upload failed: ' + uploadError);
+                isFinalizing = false;
+                updateFinalizeButtonState();
+                showPendingUI();
+                return;
+            }
+        }
+        
+        statusText.textContent = 'Finalizing';
+
+        try {
+            const response = await fetch('/api/upload/finalize', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    session_id: uploadSessionId,
+                    duration: selectedDuration()
+                })
+            });
+
+            if (!response.ok) {
+                const error = await response.json();
+                throw new Error(error.error || 'Failed to finalize upload');
+            }
+
+            const payload = await response.json();
+            showSuccess(payload);
+        } catch (error) {
+            console.error('Finalize failed:', error);
+            showErrorBanner('Finalize failed: ' + error.message);
+            statusText.textContent = 'Pending Finalization';
+            showPendingUI();
+        }
+
+        isFinalizing = false;
+        updateFinalizeButtonState();
+    }
+
     async function cancelUpload() {
         if (!uploadSessionId) return;
 
@@ -373,58 +548,57 @@
         uploadSessionId = null;
     }
 
-    /**
-     * Show success result
-     */
     function showSuccess(response) {
-        // Build share URL with password
+        clearPendingCountdown();
+
         const fullShareUrl = `${response.share_url}#${generatedPassword}`;
+        outUrl.value = fullShareUrl;
+        outPin.value = response.numeric_code;
+        outKey.value = generatedPassword;
+        outExpiryLabel.textContent = `Expiry: ${selectedDurationLabel()} retention.`;
+        uploadSessionId = null;
 
-        // Update UI
-        shareLink.value = fullShareUrl;
-        numericCode.value = response.numeric_code;
-        passwordWords.value = generatedPassword;
+        copyToClipboard(fullShareUrl, false, true);
 
-        // Copy link to clipboard automatically
-        copyToClipboard(fullShareUrl, 'Link', true);
-
-        // Show result section
-        uploadSection.classList.add('hidden');
-        resultSection.classList.remove('hidden');
+        setTimeout(() => {
+            stageProcessing.classList.add('hidden');
+            stagePending.classList.add('hidden');
+            stageOutput.classList.remove('hidden');
+            statusText.textContent = 'Secure';
+        }, 500);
     }
 
-    /**
-     * Show error
-     */
-    function showError(message) {
-        errorMessage.textContent = message;
-        uploadSection.classList.add('hidden');
-        resultSection.classList.add('hidden');
-        errorSection.classList.remove('hidden');
-    }
-
-    /**
-     * Update progress bar
-     */
-    function updateProgress(percent, text) {
-        progressFill.style.width = `${percent}%`;
-        if (text) {
-            progressText.textContent = text;
+    function showErrorBanner(message) {
+        if (!errorBanner) return;
+        if (errorBannerText) {
+            errorBannerText.textContent = message;
         }
+        errorBanner.classList.remove('hidden');
     }
 
-    /**
-     * Copy text to clipboard
-     */
-    async function copyToClipboard(text, label, silent = false) {
+    function hideErrorBanner() {
+        if (!errorBanner) return;
+        errorBanner.classList.add('hidden');
+    }
+
+    function updateProgress(percent, sub, main) {
+        progressVal.textContent = `${Math.floor(percent)}%`;
+        if (sub) processSub.textContent = sub;
+        if (main) processMain.textContent = main;
+    }
+
+    async function copyToClipboard(text, silent = false, showBanner = false) {
         try {
             await navigator.clipboard.writeText(text);
             if (!silent) {
-                showToast(`${label} copied to clipboard!`);
+                if (showBanner) {
+                    showShareBanner();
+                } else {
+                    showToast('Copied to clipboard!');
+                }
             }
         } catch (error) {
             console.error('Failed to copy:', error);
-            // Fallback for older browsers
             const textarea = document.createElement('textarea');
             textarea.value = text;
             textarea.style.position = 'fixed';
@@ -434,22 +608,41 @@
             document.execCommand('copy');
             document.body.removeChild(textarea);
             if (!silent) {
-                showToast(`${label} copied to clipboard!`);
+                if (showBanner) {
+                    showShareBanner();
+                } else {
+                    showToast('Copied to clipboard!');
+                }
             }
         }
     }
 
-    /**
-     * Show toast notification
-     */
+    function showShareBanner() {
+        const banner = document.getElementById('share-banner');
+        if (!banner) return;
+        banner.classList.remove('hidden');
+        banner.classList.add('visible');
+        const closeBtn = document.getElementById('close-share-banner');
+        if (closeBtn) {
+            closeBtn.onclick = () => {
+                banner.classList.remove('visible');
+                setTimeout(() => banner.classList.add('hidden'), 350);
+            };
+        }
+        setTimeout(() => {
+            banner.classList.remove('visible');
+            setTimeout(() => banner.classList.add('hidden'), 350);
+        }, 3500);
+    }
+
     function showToast(message) {
-        // Remove existing toast
+         
         const existingToast = document.querySelector('.toast');
         if (existingToast) {
             existingToast.remove();
         }
 
-        // Create toast
+         
         const toast = document.createElement('div');
         toast.className = 'toast';
         toast.textContent = message;
@@ -468,50 +661,80 @@
 
         document.body.appendChild(toast);
 
-        // Remove after 3 seconds
+         
         setTimeout(() => {
             toast.style.animation = 'fadeOut 0.3s ease';
             setTimeout(() => toast.remove(), 300);
         }, 3000);
     }
 
-    /**
-     * Reset upload state
-     */
     function resetUpload() {
+        clearPendingCountdown();
+        hideErrorBanner();
         selectedFile = null;
         encryptedBlob = null;
         generatedPassword = null;
-        isEncrypting = false;
-        uploadReady = false;
+        uploadSessionId = null;
+        pendingExpiresAt = null;
+        isFinalizing = false;
+        isUploading = false;
+        uploadComplete = false;
+        uploadError = null;
 
-        // Cancel any ongoing upload
+         
         if (uploadSessionId) {
             cancelUpload();
         }
 
-        // Reset UI
+         
         fileInput.value = '';
         dropZone.classList.remove('hidden');
-        fileInfo.classList.add('hidden');
-        optionsSection.classList.add('hidden');
-        progressSection.classList.add('hidden');
-        updateProgress(0, '');
+        fileDetails.classList.add('hidden');
+        tosCheck.checked = false;
+        finalizeBtn.disabled = true;
+        statusText.textContent = 'Ready';
+        statusText.style.color = 'var(--accent)';
+        stageEntry.classList.remove('hidden');
+        stageProcessing.classList.add('hidden');
+        stagePending.classList.add('hidden');
+        stageOutput.classList.add('hidden');
     }
 
-    /**
-     * Reset everything
-     */
-    function resetAll() {
-        resetUpload();
-        agreeTosCheckbox.checked = false;
-        uploadBtn.disabled = true;
-        uploadSection.classList.remove('hidden');
-        resultSection.classList.add('hidden');
-        errorSection.classList.add('hidden');
+    function startPendingCountdown() {
+        clearPendingCountdown();
+        if (!pendingExpiresAt) {
+            pendingCountdown.textContent = '10:00';
+            return;
+        }
+
+        const tick = () => {
+            const remainingMs = pendingExpiresAt - Date.now();
+            if (remainingMs <= 0) {
+                clearPendingCountdown();
+                pendingCountdown.textContent = '00:00';
+                alert('Upload session expired. Please try again.');
+                resetUpload();
+                return;
+            }
+
+            const totalSeconds = Math.floor(remainingMs / 1000);
+            const minutes = Math.floor(totalSeconds / 60);
+            const seconds = totalSeconds % 60;
+            pendingCountdown.textContent = `${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
+        };
+
+        tick();
+        pendingCountdownTimer = setInterval(tick, 1000);
     }
 
-    // Add CSS for toast animations
+    function clearPendingCountdown() {
+        if (pendingCountdownTimer) {
+            clearInterval(pendingCountdownTimer);
+            pendingCountdownTimer = null;
+        }
+    }
+
+     
     const style = document.createElement('style');
     style.textContent = `
         @keyframes fadeIn {
@@ -525,7 +748,7 @@
     `;
     document.head.appendChild(style);
 
-    // Initialize on DOM ready
+     
     if (document.readyState === 'loading') {
         document.addEventListener('DOMContentLoaded', init);
     } else {

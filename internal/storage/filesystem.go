@@ -9,7 +9,7 @@ import (
 	"strconv"
 	"strings"
 
-	"secureshare/internal/config"
+	"shareit/internal/config"
 )
 
 type Filesystem struct {
@@ -23,7 +23,7 @@ func NewFilesystem(cfg *config.Config) (*Filesystem, error) {
 	chunkDir := filepath.Join(dataDir, "chunks")
 	finalDir := filepath.Join(dataDir, "files")
 
-	// Create directories if they don't exist
+	 
 	dirs := []string{dataDir, chunkDir, finalDir}
 	for _, dir := range dirs {
 		if err := os.MkdirAll(dir, 0755); err != nil {
@@ -38,24 +38,24 @@ func NewFilesystem(cfg *config.Config) (*Filesystem, error) {
 	}, nil
 }
 
-// ---- Chunk Operations ----
+ 
 
-// GetChunkDir returns the directory for storing chunks of a session
+ 
 func (fs *Filesystem) GetChunkDir(sessionID string) string {
 	return filepath.Join(fs.chunkDir, sessionID)
 }
 
-// CreateChunkDir creates a directory for storing chunks
+ 
 func (fs *Filesystem) CreateChunkDir(sessionID string) error {
 	dir := fs.GetChunkDir(sessionID)
 	return os.MkdirAll(dir, 0755)
 }
 
-// SaveChunk saves a chunk to disk
+ 
 func (fs *Filesystem) SaveChunk(sessionID string, chunkIndex int, data io.Reader) (int64, error) {
 	dir := fs.GetChunkDir(sessionID)
 	
-	// Ensure directory exists
+	 
 	if err := os.MkdirAll(dir, 0755); err != nil {
 		return 0, err
 	}
@@ -70,7 +70,7 @@ func (fs *Filesystem) SaveChunk(sessionID string, chunkIndex int, data io.Reader
 
 	written, err := io.Copy(file, data)
 	if err != nil {
-		// Clean up partial file on error
+		 
 		os.Remove(chunkPath)
 		return 0, err
 	}
@@ -78,19 +78,19 @@ func (fs *Filesystem) SaveChunk(sessionID string, chunkIndex int, data io.Reader
 	return written, nil
 }
 
-// GetChunkPath returns the path to a specific chunk
+ 
 func (fs *Filesystem) GetChunkPath(sessionID string, chunkIndex int) string {
 	return filepath.Join(fs.GetChunkDir(sessionID), fmt.Sprintf("chunk_%d", chunkIndex))
 }
 
-// ChunkExists checks if a chunk file exists
+ 
 func (fs *Filesystem) ChunkExists(sessionID string, chunkIndex int) bool {
 	path := fs.GetChunkPath(sessionID, chunkIndex)
 	_, err := os.Stat(path)
 	return err == nil
 }
 
-// GetChunkCount returns the number of chunks stored for a session
+ 
 func (fs *Filesystem) GetChunkCount(sessionID string) (int, error) {
 	dir := fs.GetChunkDir(sessionID)
 	
@@ -111,33 +111,33 @@ func (fs *Filesystem) GetChunkCount(sessionID string) (int, error) {
 	return count, nil
 }
 
-// DeleteChunks removes all chunks for a session
+ 
 func (fs *Filesystem) DeleteChunks(sessionID string) error {
 	dir := fs.GetChunkDir(sessionID)
 	return os.RemoveAll(dir)
 }
 
-// ---- File Assembly ----
+ 
 
-// AssembleChunks combines all chunks into a final file
+ 
 func (fs *Filesystem) AssembleChunks(sessionID, fileID string, totalChunks int) error {
 	chunkDir := fs.GetChunkDir(sessionID)
 	finalPath := fs.GetFilePath(fileID)
 
-	// Create final file
+	 
 	finalFile, err := os.Create(finalPath)
 	if err != nil {
 		return fmt.Errorf("failed to create final file: %w", err)
 	}
 	defer finalFile.Close()
 
-	// Get all chunk files and sort them
+	 
 	entries, err := os.ReadDir(chunkDir)
 	if err != nil {
 		return fmt.Errorf("failed to read chunk directory: %w", err)
 	}
 
-	// Sort chunks by index
+	 
 	type chunkInfo struct {
 		index int
 		path  string
@@ -165,16 +165,16 @@ func (fs *Filesystem) AssembleChunks(sessionID, fileID string, totalChunks int) 
 		return chunks[i].index < chunks[j].index
 	})
 
-	// Verify we have all chunks
+	 
 	if len(chunks) != totalChunks {
 		return fmt.Errorf("expected %d chunks, found %d", totalChunks, len(chunks))
 	}
 
-	// Concatenate chunks
+	 
 	for _, chunk := range chunks {
 		chunkFile, err := os.Open(chunk.path)
 		if err != nil {
-			// Clean up partial final file
+			 
 			finalFile.Close()
 			os.Remove(finalPath)
 			return fmt.Errorf("failed to open chunk %d: %w", chunk.index, err)
@@ -190,30 +190,30 @@ func (fs *Filesystem) AssembleChunks(sessionID, fileID string, totalChunks int) 
 		}
 	}
 
-	// Delete chunks after successful assembly
+	 
 	if err := fs.DeleteChunks(sessionID); err != nil {
-		// Log but don't fail - file is already assembled
+		 
 		fmt.Printf("Warning: failed to delete chunks for session %s: %v\n", sessionID, err)
 	}
 
 	return nil
 }
 
-// ---- Final File Operations ----
+ 
 
-// GetFilePath returns the path to a final file
+ 
 func (fs *Filesystem) GetFilePath(fileID string) string {
 	return filepath.Join(fs.finalDir, fileID)
 }
 
-// FileExists checks if a final file exists
+ 
 func (fs *Filesystem) FileExists(fileID string) bool {
 	path := fs.GetFilePath(fileID)
 	_, err := os.Stat(path)
 	return err == nil
 }
 
-// GetFileSize returns the size of a final file
+ 
 func (fs *Filesystem) GetFileSize(fileID string) (int64, error) {
 	path := fs.GetFilePath(fileID)
 	info, err := os.Stat(path)
@@ -223,30 +223,30 @@ func (fs *Filesystem) GetFileSize(fileID string) (int64, error) {
 	return info.Size(), nil
 }
 
-// OpenFile opens a final file for reading
+ 
 func (fs *Filesystem) OpenFile(fileID string) (*os.File, error) {
 	path := fs.GetFilePath(fileID)
 	return os.Open(path)
 }
 
-// DeleteFile removes a final file
+ 
 func (fs *Filesystem) DeleteFile(fileID string) error {
 	path := fs.GetFilePath(fileID)
 	err := os.Remove(path)
 	if os.IsNotExist(err) {
-		return nil // Already deleted
+		return nil  
 	}
 	return err
 }
 
-// GetFileReader returns an io.ReadCloser for a file
+ 
 func (fs *Filesystem) GetFileReader(fileID string) (io.ReadCloser, error) {
 	return fs.OpenFile(fileID)
 }
 
-// ---- Cleanup Operations ----
+ 
 
-// GetAllFileIDs returns all file IDs in the final directory
+ 
 func (fs *Filesystem) GetAllFileIDs() ([]string, error) {
 	entries, err := os.ReadDir(fs.finalDir)
 	if err != nil {
@@ -262,7 +262,7 @@ func (fs *Filesystem) GetAllFileIDs() ([]string, error) {
 	return fileIDs, nil
 }
 
-// GetAllSessionIDs returns all session IDs with pending chunks
+ 
 func (fs *Filesystem) GetAllSessionIDs() ([]string, error) {
 	entries, err := os.ReadDir(fs.chunkDir)
 	if err != nil {
@@ -281,7 +281,7 @@ func (fs *Filesystem) GetAllSessionIDs() ([]string, error) {
 	return sessionIDs, nil
 }
 
-// GetTotalSize returns the total size of all files
+ 
 func (fs *Filesystem) GetTotalSize() (int64, error) {
 	var totalSize int64
 
@@ -298,7 +298,7 @@ func (fs *Filesystem) GetTotalSize() (int64, error) {
 	return totalSize, err
 }
 
-// CleanupOrphanedChunks removes chunk directories that don't have active sessions
+ 
 func (fs *Filesystem) CleanupOrphanedChunks(activeSessions map[string]bool) (int, error) {
 	sessionIDs, err := fs.GetAllSessionIDs()
 	if err != nil {
