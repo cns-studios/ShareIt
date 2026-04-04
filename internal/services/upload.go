@@ -136,13 +136,13 @@ func (u *Upload) InitUpload(ctx context.Context, req *models.UploadInitRequest, 
 		CreatedAt:    time.Now(),
 	}
 
-	 
 	if err := u.redis.CreateUploadSession(ctx, session); err != nil {
+		log.Printf("ERROR CreateUploadSession: %v", err)
 		return nil, fmt.Errorf("error creating upload session: %w", err)
 	}
 
-	 
 	if err := u.fs.CreateChunkDir(sessionID); err != nil {
+		log.Printf("ERROR CreateChunkDir: %v", err)
 		u.redis.DeleteUploadSession(ctx, sessionID)
 		return nil, fmt.Errorf("error creating chunk directory: %w", err)
 	}
