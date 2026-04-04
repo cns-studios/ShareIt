@@ -39,7 +39,10 @@ services:
       - POSTGRES_DB=${POSTGRES_DB:-shareit}
     volumes:
       - postgres_data:/var/lib/postgresql/data
-      - ./init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+      - type: bind
+        source: ./init.sql
+        target: /docker-entrypoint-initdb.d/init.sql
+        read_only: true
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-shareit} -d ${POSTGRES_DB:-shareit}"]
       interval: 5s
