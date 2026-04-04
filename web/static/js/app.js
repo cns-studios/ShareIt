@@ -186,13 +186,11 @@
                 }
             );
 
-            updateProgress(50, 'Encryption complete. Ready to upload.');
+            updateProgress(50, 'Encrypting complete. Uploading...');
             isEncrypting = false;
 
-            // Auto-start upload if ToS is checked
-            if (agreeTosCheckbox.checked) {
-                startUpload();
-            }
+            await startUpload();
+            
         } catch (error) {
             console.error('Encryption failed:', error);
             showError('Encryption failed: ' + error.message);
@@ -204,31 +202,38 @@
      * Update upload button state
      */
     function updateUploadButtonState() {
-        uploadBtn.disabled = !agreeTosCheckbox.checked || isEncrypting || !encryptedBlob;
-        
-        // Auto-start upload if encryption is complete and ToS is checked
-        if (agreeTosCheckbox.checked && encryptedBlob && !isUploading) {
-            startUpload();
-        }
+        uploadBtn.disabled = !agreeTosCheckbox.checked || !uploadReady;
     }
 
     /**
      * Handle upload button click
      */
     function handleUpload() {
-        if (!encryptedBlob || isUploading) return;
-        startUpload();
+        if (!uploadReady || !agreeTosCheckbox.checked) return;
+        confirmUpload();
+    }
+
+    async function confirmUpload() {
+        uploadBtn.disabled = true;
+        try {
+            const completeResponse = await completeUpload();
+            showSuccess(completeResponse);
+        } catch (error) {
+            console.error('Complete failed:', error);
+            showError('Failed to finalize upload: ' + error.message);
+            uploadBtn.disabled = false;
+        }
     }
 
     /**
      * Start the upload process
      */
+    let uploadReady = false;
+
     async function startUpload() {
         if (isUploading || !encryptedBlob) return;
 
         isUploading = true;
-        uploadBtn.disabled = true;
-        updateProgress(50, 'Starting upload...');
 
         try {
             // Initialize upload session
@@ -239,10 +244,11 @@
             await uploadChunks(initResponse);
 
             // Complete upload
-            const completeResponse = await completeUpload();
-
-            // Show success
-            showSuccess(completeResponse);
+            // Chunks uploaded, now wait for ToS ack
+            updateProgress(100, 'Ready. Accept terms to get your share link.');
+            uploadReady = true;
+            isUploading = false;
+            updateUploadButtonState();
         } catch (error) {
             console.error('Upload failed:', error);
             
@@ -255,9 +261,9 @@
                 }
             }
 
-            showError('Upload failed: ' + error.message);
-        } finally {
+            showError('Upload failed: ' + error.message)
             isUploading = false;
+            uploadReady = false;
         }
     }
 
@@ -477,6 +483,7 @@
         encryptedBlob = null;
         generatedPassword = null;
         isEncrypting = false;
+        uploadReady = false;
 
         // Cancel any ongoing upload
         if (uploadSessionId) {

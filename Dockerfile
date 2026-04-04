@@ -41,7 +41,7 @@ COPY --from=builder /app/admin .
 COPY --from=builder /app/web ./web
 
 # Copy wordlist
-COPY --from=builder /app/wordlist.txt .
+COPY --from=builder /app/wordlist.txt ./web/static/wordlist.txt
 
 # Set ownership
 RUN chown -R appuser:appuser /app

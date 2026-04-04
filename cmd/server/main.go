@@ -111,13 +111,12 @@ func main() {
 	{
 		// Upload routes (with rate limiting)
 		upload := api.Group("/upload")
-		upload.Use(rateLimiter.Handler())
-		{
-			upload.POST("/init", uploadHandler.Init)
-			upload.POST("/chunk", uploadHandler.Chunk)
-			upload.POST("/complete", uploadHandler.Complete)
-			upload.DELETE("/cancel", uploadHandler.Cancel)
-		}
+        {
+            upload.POST("/init", rateLimiter.Handler(), uploadHandler.Init)
+            upload.POST("/chunk", uploadHandler.Chunk)
+            upload.POST("/complete", uploadHandler.Complete)
+            upload.DELETE("/cancel", uploadHandler.Cancel)
+        }
 
 		// File routes
 		file := api.Group("/file")

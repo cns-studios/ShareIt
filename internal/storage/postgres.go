@@ -178,6 +178,14 @@ func (p *Postgres) DeleteExpiredFiles(ctx context.Context) (int64, error) {
 	return result.RowsAffected()
 }
 
+// GetDeletedFiles retrieves all files marked as deleted that may still have blobs on disk
+func (p *Postgres) GetDeletedFiles(ctx context.Context) ([]models.File, error) {
+	var files []models.File
+	query := `SELECT * FROM files WHERE is_deleted = TRUE`
+	err := p.db.SelectContext(ctx, &files, query)
+	return files, err
+}
+
 // GetFileForAdmin retrieves a file by ID for admin purposes (includes deleted/expired)
 func (p *Postgres) GetFileForAdmin(ctx context.Context, id string) (*models.File, error) {
 	var file models.File

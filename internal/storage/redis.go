@@ -107,7 +107,11 @@ func (r *Redis) ExtendUploadSession(ctx context.Context, sessionID string) error
 // MarkChunkUploaded marks a specific chunk as uploaded
 func (r *Redis) MarkChunkUploaded(ctx context.Context, sessionID string, chunkIndex int) error {
 	key := prefixUploadChunks + sessionID
-	return r.client.SAdd(ctx, key, chunkIndex).Err()
+	pipe := r.client.Pipeline()
+	pipe.SAdd(ctx, key, chunkIndex)
+	pipe.Expire(ctx, key, sessionTTL)
+	_, err := pipe.Exec(ctx)
+	return err
 }
 
 // IsChunkUploaded checks if a chunk has been uploaded
@@ -194,17 +198,15 @@ func (r *Redis) GetAllPendingFiles(ctx context.Context) ([]string, error) {
 func (r *Redis) CheckRateLimit(ctx context.Context, ip string) (bool, error) {
 	key := prefixRateLimit + ip
 	
-	count, err := r.client.Incr(ctx, key).Result()
+	pipe := r.client.Pipeline()
+	incr := pipe.Incr(ctx, key)
+	pipe.Expire(ctx, key, rateLimitTTL)
+	_, err := pipe.Exec(ctx)
 	if err != nil {
 		return false, err
 	}
 
-	// Set expiry on first request
-	if count == 1 {
-		r.client.Expire(ctx, key, rateLimitTTL)
-	}
-
-	return count <= rateLimitMax, nil
+	return incr.Val() <= rateLimitMax, nil
 }
 
 // GetRateLimitCount returns current request count for an IP

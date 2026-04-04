@@ -113,7 +113,7 @@ func (c *Cleanup) performCleanup() {
 // getDeletedFiles returns IDs of files marked as deleted in database
 func (c *Cleanup) getDeletedFiles(ctx context.Context) ([]string, error) {
 	// Query files that are deleted but might still have blobs
-	files, err := c.db.GetExpiredFiles(ctx)
+	files, err := c.db.GetDeletedFiles(ctx)
 	if err != nil {
 		return nil, err
 	}

@@ -125,22 +125,6 @@ func (u *Upload) InitUpload(ctx context.Context, req *models.UploadInitRequest, 
 	sessionID := models.GenerateSessionID()
 	fileID := models.GenerateID(17)
 
-	// Generate unique numeric code
-	var numericCode string
-	for i := 0; i < 10; i++ {
-		numericCode = models.GenerateNumericCode()
-		exists, err := u.db.NumericCodeExists(ctx, numericCode)
-		if err != nil {
-			return nil, fmt.Errorf("error checking numeric code: %w", err)
-		}
-		if !exists {
-			break
-		}
-		if i == 9 {
-			return nil, fmt.Errorf("failed to generate unique numeric code")
-		}
-	}
-
 	// Create upload session
 	session := &models.UploadSession{
 		SessionID:    sessionID,
