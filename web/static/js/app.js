@@ -4,7 +4,7 @@
      
     const CHUNK_SIZE = 5 * 1024 * 1024;  
     const MAX_FILE_SIZE = window.CONFIG?.maxFileSize || 786432000;  
-    const PARALLEL_CHUNK_UPLOADS = window.CONFIG?.parallelChunkUploads || 4;
+    const PARALLEL_CHUNK_UPLOADS = window.CONFIG?.parallelChunkUploads || 6;
     const MAX_CHUNK_UPLOAD_RETRIES = 5;
 
     let totalChunks = 0;
@@ -20,6 +20,9 @@
     let isFinalizing = false;
     let uploadComplete = false;
     let uploadError = null;
+    let pendingAutoCopyText = null;
+    let pendingAutoCopyBanner = false;
+    let pendingAutoCopyBound = false;
 
      
     const dropZone = document.getElementById('drop-zone');
@@ -81,9 +84,13 @@
 
          
         document.querySelectorAll('.copy-trigger').forEach(btn => {
-            btn.addEventListener('click', function() {
+            btn.addEventListener('click', async function() {
                 const input = this.parentElement.querySelector('input');
-                copyToClipboard(input.value);
+                const copied = await copyToClipboard(input.value);
+                if (!copied) {
+                    showToast('Copy failed. Please use Ctrl+C.');
+                    return;
+                }
                 const original = this.innerHTML;
                 this.innerHTML = '<i data-lucide="check" style="width: 1rem; height: 1rem;"></i>';
                 this.style.background = 'var(--accent)';
@@ -263,7 +270,7 @@
             const { status } = await res.json();
             if (status === 'done') return;
             if (status.startsWith('error:')) throw new Error(status.slice(6));
-            statusText.textContent = 'Assembling...';
+            statusText.textContent = 'Finalizing...';
             await new Promise(r => setTimeout(r, intervalMs));
         }
         throw new Error('Assembly timed out');
@@ -581,7 +588,7 @@
         outExpiryLabel.textContent = `Expiry: ${selectedDurationLabel()} retention.`;
         uploadSessionId = null;
 
-        copyToClipboard(fullShareUrl, false, true);
+        attemptAutoCopy(fullShareUrl);
 
         stageProcessing.classList.add('hidden');
         stagePending.classList.add('hidden');
@@ -619,6 +626,7 @@
                     showToast('Copied to clipboard!');
                 }
             }
+            return true;
         } catch (error) {
             console.error('Failed to copy:', error);
             const textarea = document.createElement('textarea');
@@ -627,8 +635,13 @@
             textarea.style.opacity = '0';
             document.body.appendChild(textarea);
             textarea.select();
-            document.execCommand('copy');
+            const copiedWithFallback = document.execCommand('copy');
             document.body.removeChild(textarea);
+
+            if (!copiedWithFallback) {
+                return false;
+            }
+
             if (!silent) {
                 if (showBanner) {
                     showShareBanner();
@@ -636,7 +649,66 @@
                     showToast('Copied to clipboard!');
                 }
             }
+            return true;
         }
+    }
+
+    async function attemptAutoCopy(text) {
+        const copied = await copyToClipboard(text, true, true);
+        if (copied) {
+            showShareBanner();
+            return;
+        }
+
+        showToast('Tap anywhere to retry copying the sharing link.');
+        queueAutoCopyOnNextInteraction(text, true);
+    }
+
+    function queueAutoCopyOnNextInteraction(text, showBanner) {
+        pendingAutoCopyText = text;
+        pendingAutoCopyBanner = showBanner;
+
+        if (pendingAutoCopyBound) {
+            return;
+        }
+
+        pendingAutoCopyBound = true;
+        ['click', 'keydown', 'touchstart'].forEach((eventName) => {
+            document.addEventListener(eventName, handlePendingAutoCopy, true);
+        });
+    }
+
+    async function handlePendingAutoCopy() {
+        if (!pendingAutoCopyText) {
+            clearPendingAutoCopyListeners();
+            return;
+        }
+
+        const textToCopy = pendingAutoCopyText;
+        const shouldShowBanner = pendingAutoCopyBanner;
+        const copied = await copyToClipboard(textToCopy, true, shouldShowBanner);
+
+        if (copied) {
+            if (shouldShowBanner) {
+                showShareBanner();
+            } else {
+                showToast('Copied to clipboard!');
+            }
+            pendingAutoCopyText = null;
+            pendingAutoCopyBanner = false;
+            clearPendingAutoCopyListeners();
+        }
+    }
+
+    function clearPendingAutoCopyListeners() {
+        if (!pendingAutoCopyBound) {
+            return;
+        }
+
+        ['click', 'keydown', 'touchstart'].forEach((eventName) => {
+            document.removeEventListener(eventName, handlePendingAutoCopy, true);
+        });
+        pendingAutoCopyBound = false;
     }
 
     function showShareBanner() {
@@ -692,6 +764,9 @@
 
     function resetUpload() {
         clearPendingCountdown();
+        pendingAutoCopyText = null;
+        pendingAutoCopyBanner = false;
+        clearPendingAutoCopyListeners();
         hideErrorBanner();
         selectedFile = null;
         encryptedBlob = null;
