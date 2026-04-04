@@ -140,113 +140,116 @@
     }
 
     async function processFile(file) {
-        console.log('[processFile] called with file:', file);
-        if (isUploading || isFinalizing) {
-            console.log('[processFile] Blocked: isUploading:', isUploading, 'isFinalizing:', isFinalizing);
-            return;
-        }
+        if (isUploading || isFinalizing) return;
+
         if (file.size > MAX_FILE_SIZE) {
-            console.log('[processFile] File too large:', file.size, 'MAX_FILE_SIZE:', MAX_FILE_SIZE);
             showErrorBanner(`File too large. Maximum size is ${SecureCrypto.formatFileSize(MAX_FILE_SIZE)}`);
             return;
         }
         if (file.size === 0) {
-            console.log('[processFile] File is empty');
             showErrorBanner('Cannot upload empty file');
             return;
         }
-        selectedFile = file;
-        console.log('[processFile] File selected:', file.name, 'size:', file.size);
 
-         
+        selectedFile = file;
         fileName.textContent = file.name;
         fileSize.textContent = SecureCrypto.formatFileSize(file.size);
-        dropZone.classList.add('hidden');
-        fileDetails.classList.remove('hidden');
-        statusText.textContent = 'Preparing Upload';
-        statusText.style.color = 'white';
 
-         
         dropZone.classList.add('hidden');
         fileDetails.classList.remove('hidden');
         stageEntry.classList.add('hidden');
         stageProcessing.classList.add('hidden');
         stagePending.classList.remove('hidden');
         stageOutput.classList.add('hidden');
-        statusText.textContent = 'Processing...';
-        statusText.style.color = 'white';
+        statusText.textContent = 'Ready';
+        statusText.style.color = 'var(--accent)';
         tosCheck.checked = false;
         updateFinalizeButtonState();
 
-         
         runProtocolInBackground();
     }
 
     function handleFinalize() {
         if (!tosCheck.checked || isFinalizing) return;
-        if (isUploading && !uploadComplete) {
-            stagePending.classList.add('hidden');
-            stageProcessing.classList.remove('hidden');
+
+        isFinalizing = true;
+        updateFinalizeButtonState();
+        stagePending.classList.add('hidden');
+        stageProcessing.classList.remove('hidden');
+        statusText.textContent = 'Uploading...';
+
+        if (uploadComplete) {
+            finalizeUpload();
+        } else if (uploadError) {
+            isFinalizing = false;
+            updateFinalizeButtonState();
+            stageProcessing.classList.add('hidden');
+            stagePending.classList.remove('hidden');
+            showErrorBanner('Upload failed: ' + uploadError);
+        } else {
             const poll = setInterval(() => {
                 if (uploadComplete) {
                     clearInterval(poll);
                     finalizeUpload();
                 } else if (uploadError) {
                     clearInterval(poll);
+                    isFinalizing = false;
+                    updateFinalizeButtonState();
+                    stageProcessing.classList.add('hidden');
+                    stagePending.classList.remove('hidden');
+                    statusText.textContent = 'Ready';
+                    statusText.style.color = 'var(--accent)';
                     showErrorBanner('Upload failed: ' + uploadError);
                 }
             }, 500);
-            return;
         }
-        finalizeUpload();
     }
 
     function updateFinalizeButtonState() {
         finalizeBtn.disabled = !tosCheck.checked || isFinalizing;
     }
-
     function updateUploadProgress() {
         if (totalChunks === 0) return;
         const pct = Math.floor((uploadedChunks / totalChunks) * 100);
         progressVal.textContent = `${pct}%`;
-        processSub.textContent = `Chunk ${uploadedChunks} of ${totalChunks}`;
-        processMain.textContent = 'Uploading...';
+        processSub.textContent = pct < 30
+            ? 'Sending your file...'
+            : pct < 60
+            ? 'Upload in progress...'
+            : pct < 90
+            ? 'Almost there...'
+            : 'Finishing up...';
+        processMain.textContent = 'Uploading';
     }
 
     async function runProtocolInBackground() {
-        console.log('[runProtocolInBackground] Starting');
         isUploading = true;
         uploadComplete = false;
         uploadError = null;
-        console.log('[runProtocolInBackground] isUploading set to true');
+
         try {
-            console.log('[runProtocolInBackground] Generating password...');
             generatedPassword = await SecureCrypto.generatePassword();
-            console.log('[runProtocolInBackground] Password generated:', generatedPassword);
-            console.log('[runProtocolInBackground] Encrypting file...');
-            encryptedBlob = await SecureCrypto.encryptFile(
-                selectedFile,
-                generatedPassword,
-                (progress, status) => {
-                    if (progress !== undefined && status) {
-                        console.log(`[runProtocolInBackground] Encryption progress: ${Math.round(progress * 100)}% - ${status}`);
-                    }
-                }
-            );
-            console.log('[runProtocolInBackground] File encrypted, size:', encryptedBlob.size);
-            console.log('[runProtocolInBackground] Starting upload...');
+            encryptedBlob = await SecureCrypto.encryptFile(selectedFile, generatedPassword, () => {});
             await startUploadInBackground();
-            console.log('[runProtocolInBackground] Upload finished, marking uploadComplete = true');
             uploadComplete = true;
+            isUploading = false;
             updateFinalizeButtonState();
-            console.log('[runProtocolInBackground] Finalize button state updated');
+            if (!isFinalizing) {
+                statusText.textContent = 'Ready';
+                statusText.style.color = 'var(--accent)';
+            }
         } catch (error) {
-            console.error('[runProtocolInBackground] Something failed:', error);
+            console.error('Upload pipeline failed:', error);
             uploadError = error.message;
             isUploading = false;
             uploadComplete = false;
-            hideErrorBanner();
-            showErrorBanner('Something failed: ' + error.message);
+            isFinalizing = false;
+            updateFinalizeButtonState();
+            stageProcessing.classList.add('hidden');
+            stagePending.classList.remove('hidden');
+            statusText.textContent = 'Upload Failed';
+            statusText.style.color = 'var(--color-error)';
+            showErrorBanner('Upload failed: ' + error.message);
         }
     }
 
@@ -304,15 +307,13 @@
         totalChunks = initResponse.total_chunks;
         uploadedChunks = 0;
 
-        stagePending.classList.add('hidden');
-        stageProcessing.classList.remove('hidden');
-
         await uploadChunksInBackground(initResponse);
         const completeResponse = await completeUpload();
         await waitForAssembly(uploadSessionId);
-        pendingExpiresAt = completeResponse.pending_expires_at ? new Date(completeResponse.pending_expires_at).getTime() : null;
-        statusText.textContent = 'Pending Finalization';
-        statusText.style.color = 'var(--accent)';
+
+        pendingExpiresAt = completeResponse.pending_expires_at
+            ? new Date(completeResponse.pending_expires_at).getTime()
+            : null;
         startPendingCountdown();
     }
 
@@ -508,9 +509,7 @@
     }
 
     async function finalizeUpload() {
-        isFinalizing = true;
-        updateFinalizeButtonState();
-        statusText.textContent = 'Finalizing';
+        statusText.textContent = 'Finalizing...';
 
         try {
             const response = await fetch('/api/upload/finalize', {
@@ -531,13 +530,14 @@
             showSuccess(payload);
         } catch (error) {
             console.error('Finalize failed:', error);
+            isFinalizing = false;
+            updateFinalizeButtonState();
+            stageProcessing.classList.add('hidden');
+            stagePending.classList.remove('hidden');
+            statusText.textContent = 'Ready';
+            statusText.style.color = 'var(--accent)';
             showErrorBanner('Finalize failed: ' + error.message);
-            statusText.textContent = 'Pending Finalization';
-            showPendingUI();
         }
-
-        isFinalizing = false;
-        updateFinalizeButtonState();
     }
 
     async function cancelUpload() {
@@ -558,6 +558,7 @@
 
     function showSuccess(response) {
         clearPendingCountdown();
+        isFinalizing = false;
 
         const fullShareUrl = `${response.share_url}#${generatedPassword}`;
         outUrl.value = fullShareUrl;
@@ -568,12 +569,11 @@
 
         copyToClipboard(fullShareUrl, false, true);
 
-        setTimeout(() => {
-            stageProcessing.classList.add('hidden');
-            stagePending.classList.add('hidden');
-            stageOutput.classList.remove('hidden');
-            statusText.textContent = 'Secure';
-        }, 500);
+        stageProcessing.classList.add('hidden');
+        stagePending.classList.add('hidden');
+        stageOutput.classList.remove('hidden');
+        statusText.textContent = 'Secure';
+        statusText.style.color = 'var(--accent)';
     }
 
     function showErrorBanner(message) {
