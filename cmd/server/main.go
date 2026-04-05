@@ -74,6 +74,12 @@ func main() {
 	router.Use(gin.Recovery())
 	router.Use(gin.Logger())
 
+	router.Use(func(c *gin.Context) {
+		c.Header("Connection", "keep-alive")
+		c.Header("Keep-Alive", "timeout=55")
+		c.Next()
+	})
+
 	 
 	templates := template.Must(template.ParseGlob("web/templates/*.html"))
 	router.SetHTMLTemplate(templates)
@@ -137,7 +143,7 @@ func main() {
 		ReadHeaderTimeout: 30 * time.Second,
 		ReadTimeout:       0,
 		WriteTimeout:      0,
-		IdleTimeout:       300 * time.Second,
+		IdleTimeout:       60 * time.Second,
 	}
 
 	 
