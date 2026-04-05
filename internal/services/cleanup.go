@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"shareit/internal/config"
+	"shareit/internal/models"
 	"shareit/internal/storage"
 )
 
@@ -29,13 +30,11 @@ func NewCleanup(cfg *config.Config, db *storage.Postgres, redis *storage.Redis, 
 	}
 }
 
- 
 func (c *Cleanup) Start() {
 	c.wg.Add(1)
 	go c.run()
 }
 
- 
 func (c *Cleanup) Stop() {
 	close(c.stopChan)
 	c.wg.Wait()
@@ -44,10 +43,8 @@ func (c *Cleanup) Stop() {
 func (c *Cleanup) run() {
 	defer c.wg.Done()
 
-	 
 	c.performCleanup()
 
-	 
 	ticker := time.NewTicker(5 * time.Minute)
 	defer ticker.Stop()
 
@@ -68,7 +65,6 @@ func (c *Cleanup) performCleanup() {
 
 	log.Println("Starting cleanup cycle...")
 
-	 
 	expiredCount, err := c.db.DeleteExpiredFiles(ctx)
 	if err != nil {
 		log.Printf("Error marking expired files as deleted: %v", err)
@@ -76,7 +72,6 @@ func (c *Cleanup) performCleanup() {
 		log.Printf("Marked %d expired files as deleted", expiredCount)
 	}
 
-	 
 	deletedFiles, err := c.getDeletedFiles(ctx)
 	if err != nil {
 		log.Printf("Error getting deleted files: %v", err)
@@ -91,7 +86,6 @@ func (c *Cleanup) performCleanup() {
 		}
 	}
 
-	 
 	orphanedCount, err := c.cleanupOrphanedChunks(ctx)
 	if err != nil {
 		log.Printf("Error cleaning up orphaned chunks: %v", err)
@@ -99,7 +93,6 @@ func (c *Cleanup) performCleanup() {
 		log.Printf("Cleaned up %d orphaned chunk directories", orphanedCount)
 	}
 
-	 
 	orphanedFiles, err := c.cleanupOrphanedFiles(ctx)
 	if err != nil {
 		log.Printf("Error cleaning up orphaned files: %v", err)
@@ -110,9 +103,8 @@ func (c *Cleanup) performCleanup() {
 	log.Println("Cleanup cycle completed")
 }
 
- 
 func (c *Cleanup) getDeletedFiles(ctx context.Context) ([]string, error) {
-	 
+
 	files, err := c.db.GetDeletedFiles(ctx)
 	if err != nil {
 		return nil, err
@@ -128,27 +120,23 @@ func (c *Cleanup) getDeletedFiles(ctx context.Context) ([]string, error) {
 	return fileIDs, nil
 }
 
- 
 func (c *Cleanup) cleanupOrphanedChunks(ctx context.Context) (int, error) {
-	 
+
 	activeSessions, err := c.redis.GetAllActiveSessions(ctx)
 	if err != nil {
 		return 0, err
 	}
 
-	 
 	activeMap := make(map[string]bool)
 	for _, sessionID := range activeSessions {
 		activeMap[sessionID] = true
 	}
 
-	 
 	return c.fs.CleanupOrphanedChunks(activeMap)
 }
 
- 
 func (c *Cleanup) cleanupOrphanedFiles(ctx context.Context) (int, error) {
-	 
+
 	diskFiles, err := c.fs.GetAllFileIDs()
 	if err != nil {
 		return 0, err
@@ -156,32 +144,29 @@ func (c *Cleanup) cleanupOrphanedFiles(ctx context.Context) (int, error) {
 
 	cleaned := 0
 	for _, fileID := range diskFiles {
-		 
+
 		_, err := c.db.GetFileForAdmin(ctx, fileID)
 		if err != nil {
-			isPending, pendingErr := c.redis.IsFilePending(ctx, fileID)
-			if pendingErr == nil && isPending {
-				continue
+			if err == models.ErrFileNotFound {
+				if err := c.fs.DeleteFile(fileID); err != nil {
+					log.Printf("Error deleting orphaned file %s: %v", fileID, err)
+					continue
+				}
+				cleaned++
+			} else {
+				log.Printf("Warning: DB error checking file %s, skipping: %v", fileID, err)
 			}
-
-			 
-			if err := c.fs.DeleteFile(fileID); err != nil {
-				log.Printf("Error deleting orphaned file %s: %v", fileID, err)
-				continue
-			}
-			cleaned++
+			continue
 		}
 	}
 
 	return cleaned, nil
 }
 
- 
 func (c *Cleanup) ForceCleanup() {
 	c.performCleanup()
 }
 
- 
 func (c *Cleanup) GetStats(ctx context.Context) (map[string]interface{}, error) {
 	totalFiles, activeFiles, totalReports, totalSize, err := c.db.GetStats(ctx)
 	if err != nil {
@@ -204,12 +189,12 @@ func (c *Cleanup) GetStats(ctx context.Context) (map[string]interface{}, error) 
 	}
 
 	return map[string]interface{}{
-		"total_files_db":     totalFiles,
-		"active_files_db":    activeFiles,
-		"total_reports":      totalReports,
-		"total_size_db":      totalSize,
-		"total_size_disk":    diskSize,
-		"active_sessions":    len(activeSessions),
-		"pending_files":      len(pendingFiles),
+		"total_files_db":  totalFiles,
+		"active_files_db": activeFiles,
+		"total_reports":   totalReports,
+		"total_size_db":   totalSize,
+		"total_size_disk": diskSize,
+		"active_sessions": len(activeSessions),
+		"pending_files":   len(pendingFiles),
 	}, nil
 }

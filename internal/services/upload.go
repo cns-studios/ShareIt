@@ -32,13 +32,11 @@ func NewUpload(cfg *config.Config, db *storage.Postgres, redis *storage.Redis, f
 	}
 }
 
- 
 func (u *Upload) StartPendingCleanup() {
 	u.wg.Add(1)
 	go u.runPendingCleanup()
 }
 
- 
 func (u *Upload) Stop() {
 	close(u.stopChan)
 	u.wg.Wait()
@@ -47,7 +45,6 @@ func (u *Upload) Stop() {
 func (u *Upload) runPendingCleanup() {
 	defer u.wg.Done()
 
-	 
 	ticker := time.NewTicker(1 * time.Minute)
 	defer ticker.Stop()
 
@@ -66,7 +63,6 @@ func (u *Upload) cleanupPendingUploads() {
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 
-	 
 	sessionIDs, err := u.fs.GetAllSessionIDs()
 	if err != nil {
 		log.Printf("Error getting session IDs: %v", err)
@@ -74,10 +70,10 @@ func (u *Upload) cleanupPendingUploads() {
 	}
 
 	for _, sessionID := range sessionIDs {
-		 
+
 		session, err := u.redis.GetUploadSession(ctx, sessionID)
 		if err == models.ErrSessionNotFound {
-			 
+
 			log.Printf("Cleaning up expired session: %s", sessionID)
 			if err := u.fs.DeleteChunks(sessionID); err != nil {
 				log.Printf("Error deleting chunks for session %s: %v", sessionID, err)
@@ -89,7 +85,6 @@ func (u *Upload) cleanupPendingUploads() {
 			continue
 		}
 
-		 
 		isPending, err := u.redis.IsFilePending(ctx, session.FileID)
 		if err != nil {
 			log.Printf("Error checking pending status for file %s: %v", session.FileID, err)
@@ -97,8 +92,7 @@ func (u *Upload) cleanupPendingUploads() {
 		}
 
 		if !isPending {
-			 
-			 
+
 			chunkCount, chunkErr := u.fs.GetChunkCount(sessionID)
 			if chunkErr != nil {
 				log.Printf("Error checking chunk count for session %s: %v", sessionID, chunkErr)
@@ -113,18 +107,15 @@ func (u *Upload) cleanupPendingUploads() {
 	}
 }
 
- 
 func (u *Upload) InitUpload(ctx context.Context, req *models.UploadInitRequest, uploaderIP string) (*models.UploadInitResponse, error) {
-	 
+
 	if req.FileSize > u.cfg.MaxFileSize {
 		return nil, models.ErrFileTooLarge
 	}
 
-	 
 	sessionID := models.GenerateSessionID()
 	fileID := models.GenerateID(17)
 
-	 
 	session := &models.UploadSession{
 		SessionID:    sessionID,
 		FileID:       fileID,
@@ -155,20 +146,17 @@ func (u *Upload) InitUpload(ctx context.Context, req *models.UploadInitRequest, 
 	}, nil
 }
 
- 
 func (u *Upload) UploadChunk(ctx context.Context, sessionID string, chunkIndex int, data io.Reader) error {
-	 
+
 	session, err := u.redis.GetUploadSession(ctx, sessionID)
 	if err != nil {
 		return err
 	}
 
-	 
 	if chunkIndex < 0 || chunkIndex >= session.TotalChunks {
 		return models.ErrInvalidChunk
 	}
 
-	 
 	exists, err := u.redis.IsChunkUploaded(ctx, sessionID, chunkIndex)
 	if err != nil {
 		return err
@@ -177,20 +165,16 @@ func (u *Upload) UploadChunk(ctx context.Context, sessionID string, chunkIndex i
 		return models.ErrChunkAlreadyExists
 	}
 
-	 
 	_, err = u.fs.SaveChunk(sessionID, chunkIndex, data)
 	if err != nil {
 		return fmt.Errorf("error saving chunk: %w", err)
 	}
 
-	 
 	if err := u.redis.MarkChunkUploaded(ctx, sessionID, chunkIndex); err != nil {
-		 
-		 
+
 		return fmt.Errorf("error marking chunk as uploaded: %w", err)
 	}
 
-	 
 	if err := u.redis.ExtendUploadSession(ctx, sessionID); err != nil {
 		log.Printf("Warning: failed to extend session TTL: %v", err)
 	}
@@ -198,9 +182,8 @@ func (u *Upload) UploadChunk(ctx context.Context, sessionID string, chunkIndex i
 	return nil
 }
 
- 
 func (u *Upload) CompleteUpload(ctx context.Context, sessionID string) (*models.UploadCompleteResponse, error) {
-	 
+
 	session, err := u.redis.GetUploadSession(ctx, sessionID)
 	if err != nil {
 		return nil, err
@@ -215,7 +198,6 @@ func (u *Upload) CompleteUpload(ctx context.Context, sessionID string) (*models.
 		return nil, models.ErrUploadIncomplete
 	}
 
-	 
 	pendingTTL := u.redis.PendingTTL()
 	if err := u.redis.MarkFilePending(ctx, session.FileID, sessionID); err != nil {
 		return nil, fmt.Errorf("error marking file as pending: %w", err)
@@ -236,12 +218,10 @@ func (u *Upload) CompleteUpload(ctx context.Context, sessionID string) (*models.
 			u.redis.RemovePendingFile(bgCtx, session.FileID)
 			return
 		}
+		u.redis.DeleteChunkTracking(bgCtx, sessionID)
 		u.redis.SetAssemblyStatus(bgCtx, sessionID, "done")
 		log.Printf("Assembly complete for session %s file %s", sessionID, session.FileID)
 	}()
-
-	 
-	u.redis.DeleteChunkTracking(ctx, sessionID)
 
 	return &models.UploadCompleteResponse{
 		SessionID:        sessionID,
@@ -254,7 +234,6 @@ func (u *Upload) GetAssemblyStatus(ctx context.Context, sessionID string) (strin
 	return u.redis.GetAssemblyStatus(ctx, sessionID)
 }
 
- 
 func (u *Upload) FinalizeUpload(ctx context.Context, sessionID, duration string) (*models.UploadFinalizeResponse, error) {
 	session, err := u.redis.GetUploadSession(ctx, sessionID)
 	if err != nil {
@@ -272,8 +251,8 @@ func (u *Upload) FinalizeUpload(ctx context.Context, sessionID, duration string)
 		return nil, models.ErrUploadNotPending
 	}
 
-    var dur time.Duration
-    dur, err = models.ParseFinalizeDuration(duration)
+	var dur time.Duration
+	dur, err = models.ParseFinalizeDuration(duration)
 	if err != nil {
 		return nil, err
 	}
@@ -329,20 +308,17 @@ func (u *Upload) generateUniqueNumericCode(ctx context.Context) (string, error) 
 	return "", fmt.Errorf("failed to generate unique numeric code")
 }
 
- 
 func (u *Upload) CancelUpload(ctx context.Context, sessionID string) error {
-	 
+
 	session, err := u.redis.GetUploadSession(ctx, sessionID)
 	if err != nil && err != models.ErrSessionNotFound {
 		return err
 	}
 
-	 
 	if err := u.fs.DeleteChunks(sessionID); err != nil {
 		log.Printf("Error deleting chunks for session %s: %v", sessionID, err)
 	}
 
-	 
 	if session != nil {
 		if u.fs.FileExists(session.FileID) {
 			u.fs.DeleteFile(session.FileID)
@@ -355,33 +331,28 @@ func (u *Upload) CancelUpload(ctx context.Context, sessionID string) error {
 	return nil
 }
 
- 
 func (u *Upload) CleanupSession(ctx context.Context, sessionID string) {
 	session, _ := u.redis.GetUploadSession(ctx, sessionID)
-	
-	 
+
 	if err := u.fs.DeleteChunks(sessionID); err != nil {
 		log.Printf("Error deleting chunks for session %s: %v", sessionID, err)
 	}
 
-	 
 	if session != nil {
 		if u.fs.FileExists(session.FileID) {
 			_, err := u.db.GetFileByID(ctx, session.FileID)
 			if err == models.ErrFileNotFound {
-				 
+
 				u.fs.DeleteFile(session.FileID)
 			}
 		}
 		u.redis.RemovePendingFile(ctx, session.FileID)
 	}
 
-	 
 	u.redis.DeleteUploadSession(ctx, sessionID)
 	u.redis.DeleteChunkTracking(ctx, sessionID)
 }
 
- 
 func (u *Upload) GetUploadProgress(ctx context.Context, sessionID string) (int, int, error) {
 	session, err := u.redis.GetUploadSession(ctx, sessionID)
 	if err != nil {

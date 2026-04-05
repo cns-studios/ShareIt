@@ -36,6 +36,15 @@
     const reportCancel = document.getElementById('report-cancel');
     const reportConfirm = document.getElementById('report-confirm');
 
+    function getCookieValue(name) {
+        const value = `; ${document.cookie}`;
+        const parts = value.split(`; ${name}=`);
+        if (parts.length === 2) {
+            return parts.pop().split(';').shift();
+        }
+        return '';
+    }
+
     async function init() {
         const fileID = window.CONFIG?.fileID;
         
@@ -241,7 +250,8 @@
             const response = await fetch(`/api/file/${fileMetadata.id}/report`, {
                 method: 'POST',
                 headers: {
-                    'Content-Type': 'application/json'
+                    'Content-Type': 'application/json',
+                    'X-CSRF-Token': getCookieValue('csrf_token')
                 }
             });
 

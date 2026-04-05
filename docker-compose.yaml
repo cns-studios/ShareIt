@@ -67,7 +67,6 @@ services:
       - shareit
 
 volumes:
-  file_data:
   postgres_data:
   redis_data:
   chunk_data:

@@ -30,7 +30,7 @@ const (
 	sessionTTL     = 1 * time.Hour
 	pendingTTL     = 10 * time.Minute
 	rateLimitTTL   = 1 * time.Minute
-	rateLimitMax   = 30
+	rateLimitMax   = 2
 )
 
 func NewRedis(cfg *config.Config) (*Redis, error) {

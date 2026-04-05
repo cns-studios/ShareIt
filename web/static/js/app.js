@@ -54,6 +54,15 @@
     const outKey = document.getElementById('out-key');
     const outExpiryLabel = document.getElementById('out-expiry-label');
 
+    function getCookieValue(name) {
+        const value = `; ${document.cookie}`;
+        const parts = value.split(`; ${name}=`);
+        if (parts.length === 2) {
+            return parts.pop().split(';').shift();
+        }
+        return '';
+    }
+
     async function init() {
          
         try {
@@ -393,6 +402,9 @@
 
                 const response = await fetch('/api/upload/chunk', {
                     method: 'POST',
+                    headers: {
+                        'X-CSRF-Token': getCookieValue('csrf_token')
+                    },
                     body: formData
                 });
 
@@ -442,7 +454,8 @@
         const response = await fetch('/api/upload/init', {
             method: 'POST',
             headers: {
-                'Content-Type': 'application/json'
+                'Content-Type': 'application/json',
+                'X-CSRF-Token': getCookieValue('csrf_token')
             },
             body: JSON.stringify({
                 file_name: selectedFile.name,
@@ -477,7 +490,8 @@
         const response = await fetch('/api/upload/complete', {
             method: 'POST',
             headers: {
-                'Content-Type': 'application/json'
+                'Content-Type': 'application/json',
+                'X-CSRF-Token': getCookieValue('csrf_token')
             },
             body: JSON.stringify({
                 session_id: uploadSessionId,
@@ -535,7 +549,10 @@
         try {
             const response = await fetch('/api/upload/finalize', {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRF-Token': getCookieValue('csrf_token')
+                },
                 body: JSON.stringify({
                     session_id: uploadSessionId,
                     duration: selectedDuration()
@@ -567,7 +584,8 @@
         await fetch('/api/upload/cancel', {
             method: 'DELETE',
             headers: {
-                'Content-Type': 'application/json'
+                'Content-Type': 'application/json',
+                'X-CSRF-Token': getCookieValue('csrf_token')
             },
             body: JSON.stringify({
                 session_id: uploadSessionId
@@ -783,7 +801,10 @@
         if (sessionToCancel) {
             fetch('/api/upload/cancel', {
                 method: 'DELETE',
-                headers: { 'Content-Type': 'application/json' },
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRF-Token': getCookieValue('csrf_token')
+                },
                 body: JSON.stringify({ session_id: sessionToCancel })
             }).catch(e => console.error('Failed to cancel upload:', e));
         }
