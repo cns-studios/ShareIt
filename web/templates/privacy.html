@@ -10,8 +10,6 @@
     <script src="https://unpkg.com/lucide@latest"></script>
 </head>
 <body>
-    <div class="grid-line h-line" style="top: 15%;"></div>
-
     <div class="container">
         <header>
             <div class="space-y-1">
@@ -20,19 +18,22 @@
             </div>
         </header>
 
-        <main style="padding: 3rem 1.5rem; max-width: 800px; margin: 0 auto;">
+        <main style="padding: 3rem 2rem; max-width: 900px; margin: 0 auto;">
             <article class="legal-document">
-                <h1>Privacy Policy</h1>
+                <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 1.5rem;">
+                    <h1>Privacy Policy</h1>
+                    <a href="/" class="btn btn-secondary" style="white-space: nowrap;">< Back to Home</a>
+                </div>
                 <p class="last-updated">Last updated: April 4, 2026</p>
 
                 <p>
-                    This Privacy Policy describes how CNS Studios ("we", "us", or "our") collects, uses, and handles your information when you use this website and the temporary note-sharing service ("Service").
+                    This Privacy Policy describes how CNS Studios ("we", "us", or "our") collects, uses, and handles your information when you use this website and the file-sharing service ("Service").
                 </p>
 
                 <section>
                     <h2>1. Information We Collect</h2>
                     <ul>
-                        <li><strong>User Content:</strong> When you create a note, we store the text content you submit and the expiration duration you select.</li>
+                        <li><strong>User Content:</strong> When you drop a file, we upload the encrypted content you submit and the expiration duration you select to our servers.</li>
                         <li><strong>Usage Data:</strong> We may collect standard server logs, including IP addresses and request timestamps, to monitor system health and prevent abuse. IP addresses are specifically monitored to enforce rate limits on file reporting and to prevent spam.</li>
                     </ul>
                 </section>
@@ -40,14 +41,14 @@
                 <section>
                     <h2>2. How We Use Information</h2>
                     <p>
-                        We use your information solely to provide the Service, specifically to store and retrieve your notes for the duration you specify.
+                        We use your information solely to provide the Service, specifically to store and retrieve your files for the duration you specify.
                     </p>
                 </section>
 
                 <section>
                     <h2>3. Data Retention</h2>
                     <p>
-                        Notes and uploaded data is automatically deleted from our servers after the expiration time you selected (e.g., 1 hour, 24 hours). Notes set to "infinite" are retained until manually deleted or until the service is discontinued.
+                        Files and uploaded data is automatically deleted from our servers after the expiration time you selected (e.g., 1 hour, 24 hours).
                     </p>
                 </section>
 
@@ -58,10 +59,6 @@
                     </p>
                 </section>
             </article>
-
-            <div class="back-link">
-                <a href="/" class="btn btn-secondary">< Back to Home</a>
-            </div>
         </main>
 
         <footer>

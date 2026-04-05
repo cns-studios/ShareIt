@@ -1046,10 +1046,17 @@ footer a:hover {
 }
 
  
+main:has(.legal-document) {
+    display: block !important;
+    max-width: 100% !important;
+    padding: 0 !important;
+}
+
 .legal-document {
-    max-width: 800px;
+    max-width: 100%;
     margin: 0 auto;
     color: var(--color-text);
+    padding: 3rem 4rem;
 }
 
 .legal-document h1 {
