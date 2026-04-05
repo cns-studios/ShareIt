@@ -41,10 +41,11 @@ func (d *Discord) SendReportNotification(file *models.File, reporterIP string, r
 	shareURL := fmt.Sprintf("%s/shared/%s", d.baseURL, file.ID)
 
 	payload := models.DiscordWebhookPayload{
+		Content: "@everyone",
 		Embeds: []models.Embed{
 			{
 				Title: "File Reported",
-				Color: 15158332,  
+				Color: 15158332,
 				Fields: []models.Field{
 					{
 						Name:   "File ID",
@@ -112,6 +113,7 @@ func (d *Discord) SendAutoDeleteNotification(file *models.File) error {
 	}
 
 	payload := models.DiscordWebhookPayload{
+		Content: "@everyone",
 		Embeds: []models.Embed{
 			{
 				Title:       "File Auto-Deleted",
