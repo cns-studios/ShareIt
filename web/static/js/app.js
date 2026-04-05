@@ -156,7 +156,7 @@
             return;
         }
         if (file.size === 0) {
-            showErrorBanner('Cannot upload empty file');
+            showErrorBanner('Cannot upload empty file or directory.');
             return;
         }
 
