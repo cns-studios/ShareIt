@@ -30,9 +30,15 @@
                     <h1>ShareIt</h1>
                     <p class="subtitle">End-to-End Encrypted File Sharing</p>
                 </div>
+                {{if .authenticated}}
+                <a href="#" class="btn btn-secondary btn-cns-login" style="white-space: nowrap; margin-left: auto;" onclick="return false;" aria-disabled="true">
+                    Logged in as: {{.username}}
+                </a>
+                {{else}}
                 <a href="{{.authLoginURL}}" class="btn btn-secondary btn-cns-login" style="white-space: nowrap; margin-left: auto;">
                     Login with CNS
                 </a>
+                {{end}}
             </div>
         </header>
 

@@ -38,6 +38,10 @@ func (h *PageHandler) Index(c *gin.Context) {
 	user := middleware.GetCNSUser(c)
 	tier := middleware.GetTier(h.cfg, user)
 	authenticated := user != nil
+	username := ""
+	if user != nil {
+		username = user.Username
+	}
 	authLoginURL := ""
 	if h.cfg.CNSAuthURL != "" {
 		authLoginURL = h.cfg.CNSAuthURL + "/login?redirect_uri=" + h.cfg.BaseURL
@@ -61,6 +65,7 @@ func (h *PageHandler) Index(c *gin.Context) {
 		"authenticated": authenticated,
 		"allowedDurations": tier.AllowedDurations,
 		"authLoginURL": authLoginURL,
+		"username":    username,
 		"configJSON":  template.JS(string(configJSON)),
 	})
 }
