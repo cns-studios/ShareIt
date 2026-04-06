@@ -20,12 +20,12 @@ type DesktopFile struct {
 }
 
 type DesktopFileMetadata struct {
-	ID           string    `json:"id"`
-	NumericCode  string    `json:"numeric_code"`
-	FileName     string    `json:"file_name"`
-	FileSize     int64     `json:"file_size"`
-	ExpiresAt    time.Time `json:"expires_at"`
-	UploadedAt   time.Time `json:"uploaded_at"`
+	ID          string    `db:"id"           json:"id"`
+	NumericCode string    `db:"numeric_code" json:"numeric_code"`
+	FileName    string    `db:"file_name"    json:"file_name"`
+	FileSize    int64     `db:"file_size"    json:"file_size"`
+	ExpiresAt   time.Time `db:"expires_at"   json:"expires_at"`
+	UploadedAt  time.Time `db:"uploaded_at"  json:"uploaded_at"`
 }
 
 
