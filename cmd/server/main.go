@@ -84,6 +84,7 @@ func main() {
 	uploadHandler := handlers.NewUploadHandler(cfg, db, rdb, fs, uploadService)
 	downloadHandler := handlers.NewDownloadHandler(cfg, db, fs)
 	reportHandler := handlers.NewReportHandler(cfg, db, discord)
+	desktopHandler := handlers.NewDesktopHandler(cfg, db, fs, uploadService)
 
 	staticFS := http.StripPrefix("/static", http.FileServer(http.Dir("./web/static")))
 	serveStatic := func(c *gin.Context) {
@@ -125,6 +126,31 @@ func main() {
 			file.GET("/:id/download", downloadHandler.Download)
 			file.GET("/code/:code", downloadHandler.GetByCode)
 			file.POST("/:id/report", reportHandler.Report)
+		}
+
+		desktop := router.Group("/desktop")
+		{
+			desktop.GET("/auth/verify", desktopHandler.VerifyKey)
+			desktop.GET("/ws", desktopHandler.WebSocket)
+			desktopAuth := desktop.Group("")
+			desktopAuth.Use(middleware.DesktopAuthMiddleware(db))
+			{
+				upload := desktopAuth.Group("/upload")
+				{
+					upload.POST("/init",           desktopHandler.UploadInit)
+					upload.POST("/chunk",          desktopHandler.UploadChunk)
+					upload.POST("/complete",       desktopHandler.UploadComplete)
+					upload.POST("/finalize",       desktopHandler.UploadFinalize)
+					upload.GET("/status/:session_id", desktopHandler.UploadStatus)
+				}
+	
+				files := desktopAuth.Group("/files")
+				{
+					files.GET("",           desktopHandler.ListFiles)
+					files.GET("/:id",      desktopHandler.GetFile)
+					files.GET("/:id/download", desktopHandler.DownloadFile)
+				}
+			}
 		}
 	}
 

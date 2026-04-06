@@ -94,6 +94,41 @@ func main() {
 	case "cleanup":
 		forceCleanup(ctx, cfg, db, fs)
 
+	case "create-key":
+		if len(os.Args) < 3 {
+			fmt.Fprintln(os.Stderr, "Usage: admin create-key <owner_name>")
+			os.Exit(1)
+		}
+		createDesktopKey(ctx, db, strings.Join(os.Args[2:], " "))
+
+	case "revoke-key":
+		if len(os.Args) < 3 {
+			fmt.Fprintln(os.Stderr, "Usage: admin revoke-key <key_value_or_id>")
+			os.Exit(1)
+		}
+		revokeDesktopKey(ctx, db, os.Args[2])
+
+	case "list-keys":
+		listDesktopKeys(ctx, db)
+
+	case "key-info":
+		if len(os.Args) < 3 {
+			fmt.Fprintln(os.Stderr, "Usage: admin key-info <key_value_or_id>")
+			os.Exit(1)
+		}
+		keyInfo(ctx, db, os.Args[2])
+
+	case "key-files":
+		if len(os.Args) < 3 {
+			fmt.Fprintln(os.Stderr, "Usage: admin key-files <key_value_or_id> [limit]")
+			os.Exit(1)
+		}
+		limit := 20
+		if len(os.Args) >= 4 {
+			fmt.Sscanf(os.Args[3], "%d", &limit)
+		}
+		keyFiles(ctx, db, os.Args[2], limit)
+
 	case "help":
 		printUsage()
 
@@ -110,24 +145,34 @@ ShareIt Admin CLI
 
 Usage: admin <command> [arguments]
 
-Commands:
-  view <file_id>              View file metadata
-  delete <file_id>            Delete a file
-  download <file_id> [path]   Download encrypted file (optionally specify output path)
-  list [limit] [offset]       List files (default: limit=20, offset=0)
-  stats                       Show system statistics
-  reports <file_id>           Show reports for a file
-  cleanup                     Force cleanup of expired files
-  help                        Show this help message
+FILE COMMANDS
+  view <file_id>                    View file metadata
+  delete <file_id>                  Delete a file
+  download <file_id> [path]         Download encrypted file (optionally specify output path)
+  list [limit] [offset]             List all files (default: limit=20, offset=0)
+  stats                             Show system statistics
+  reports <file_id>                 Show reports for a file
+  cleanup                           Force cleanup of expired files
+
+DESKTOP KEY COMMANDS
+  create-key <owner_name>           Create a new desktop API key for the given owner
+  revoke-key <key_or_id>            Revoke a desktop API key (accepts key value or UUID)
+  list-keys                         List all desktop API keys
+  key-info <key_or_id>              Show details and file stats for a key
+  key-files <key_or_id> [limit]     List active files owned by a key (default: limit=20)
+
+  help                              Show this help message
 
 Examples:
   admin view abc123def456ghi78
   admin delete abc123def456ghi78
-  admin download abc123def456ghi78 ./output.enc
   admin list 50 0
   admin stats
-  admin reports abc123def456ghi78
-  admin cleanup
+  admin create-key "CNS_Team"
+  admin revoke-key dz_abc123...
+  admin list-keys
+  admin key-info dz_abc123...
+  admin key-files dz_abc123... 50
 `
 	fmt.Println(usage)
 }
@@ -394,4 +439,153 @@ func formatFileSize(bytes int64) string {
 	}
 
 	return fmt.Sprintf("%.2f %cB", float64(bytes)/float64(div), "KMGTPE"[exp])
+}
+
+func createDesktopKey(ctx context.Context, db *storage.Postgres, ownerName string) {
+	key, err := models.GenerateAPIKey()
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Error generating key: %v\n", err)
+		os.Exit(1)
+	}
+
+	record := &models.DesktopAPIKey{
+		KeyValue:  key,
+		OwnerName: ownerName,
+	}
+
+	if err := db.CreateDesktopAPIKey(ctx, record); err != nil {
+		fmt.Fprintf(os.Stderr, "Error creating key: %v\n", err)
+		os.Exit(1)
+	}
+
+	fmt.Println(strings.Repeat("=", 60))
+	fmt.Println("DESKTOP API KEY CREATED")
+	fmt.Println(strings.Repeat("=", 60))
+	fmt.Printf("Owner:     %s\n", record.OwnerName)
+	fmt.Printf("Key:       %s\n", record.KeyValue)
+	fmt.Printf("ID:        %s\n", record.ID)
+	fmt.Println(strings.Repeat("=", 60))
+	fmt.Println("Store this key securely — it will not be shown again.")
+}
+
+func revokeDesktopKey(ctx context.Context, db *storage.Postgres, keyOrID string) {
+	err := db.RevokeDesktopAPIKey(ctx, keyOrID)
+	if err == models.ErrAPIKeyNotFound {
+		err = db.RevokeDesktopAPIKeyByID(ctx, keyOrID)
+	}
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Error revoking key: %v\n", err)
+		os.Exit(1)
+	}
+	fmt.Printf("Key %s has been revoked.\n", keyOrID)
+}
+
+func listDesktopKeys(ctx context.Context, db *storage.Postgres) {
+	keys, err := db.ListDesktopAPIKeys(ctx)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Error listing keys: %v\n", err)
+		os.Exit(1)
+	}
+
+	if len(keys) == 0 {
+		fmt.Println("No desktop API keys found.")
+		return
+	}
+
+	fmt.Println(strings.Repeat("=", 100))
+	fmt.Printf("%-36s  %-20s  %-20s  %-8s  %s\n", "ID", "OWNER", "CREATED", "ACTIVE", "KEY (first 16)")
+	fmt.Println(strings.Repeat("-", 100))
+	for _, k := range keys {
+		preview := k.KeyValue
+		if len(preview) > 16 {
+			preview = preview[:16] + "..."
+		}
+		fmt.Printf("%-36s  %-20s  %-20s  %-8t  %s\n",
+			k.ID,
+			k.OwnerName,
+			k.CreatedAt.Format("2006-01-02 15:04:05"),
+			k.IsActive,
+			preview,
+		)
+	}
+	fmt.Println(strings.Repeat("=", 100))
+	fmt.Printf("Total: %d key(s)\n", len(keys))
+}
+
+func keyInfo(ctx context.Context, db *storage.Postgres, keyOrID string) {
+	key, err := db.GetDesktopAPIKey(ctx, keyOrID)
+	if err == models.ErrAPIKeyNotFound {
+		key, err = db.GetDesktopAPIKeyByID(ctx, keyOrID)
+	}
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Key not found: %v\n", err)
+		os.Exit(1)
+	}
+
+	count, totalSize, err := db.GetDesktopFileStats(ctx, key.ID)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Error getting file stats: %v\n", err)
+	}
+
+	fmt.Println(strings.Repeat("=", 60))
+	fmt.Println("DESKTOP API KEY INFO")
+	fmt.Println(strings.Repeat("=", 60))
+	fmt.Printf("ID:            %s\n", key.ID)
+	fmt.Printf("Owner:         %s\n", key.OwnerName)
+	fmt.Printf("Active:        %t\n", key.IsActive)
+	fmt.Printf("Created:       %s\n", key.CreatedAt.Format(time.RFC3339))
+	fmt.Printf("Key (preview): %s...\n", key.KeyValue[:min(16, len(key.KeyValue))])
+	fmt.Printf("Active Files:  %d\n", count)
+	fmt.Printf("Total Size:    %s\n", formatFileSize(totalSize))
+	fmt.Println(strings.Repeat("=", 60))
+}
+
+func keyFiles(ctx context.Context, db *storage.Postgres, keyOrID string, limit int) {
+	key, err := db.GetDesktopAPIKey(ctx, keyOrID)
+	if err == models.ErrAPIKeyNotFound {
+		key, err = db.GetDesktopAPIKeyByID(ctx, keyOrID)
+	}
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Key not found: %v\n", err)
+		os.Exit(1)
+	}
+
+	files, err := db.ListFilesByAPIKey(ctx, key.ID, limit, 0)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Error listing files: %v\n", err)
+		os.Exit(1)
+	}
+
+	if len(files) == 0 {
+		fmt.Printf("No active files for key owner: %s\n", key.OwnerName)
+		return
+	}
+
+	fmt.Println(strings.Repeat("=", 100))
+	fmt.Printf("FILES FOR: %s (%s)\n", key.OwnerName, key.ID)
+	fmt.Println(strings.Repeat("=", 100))
+	fmt.Printf("%-20s  %-12s  %-30s  %-12s  %s\n", "ID", "CODE", "NAME", "SIZE", "EXPIRES")
+	fmt.Println(strings.Repeat("-", 100))
+	for _, f := range files {
+		name := f.FileName
+		if len(name) > 28 {
+			name = name[:25] + "..."
+		}
+		fmt.Printf("%-20s  %-12s  %-30s  %-12s  %s\n",
+			f.ID,
+			f.NumericCode,
+			name,
+			formatFileSize(f.FileSize),
+			f.ExpiresAt.Format("2006-01-02 15:04"),
+		)
+	}
+	fmt.Println(strings.Repeat("=", 100))
+	fmt.Printf("Showing %d file(s)\n", len(files))
+}
+
+func min(a, b int) int {
+	if a < b {
+		return a
+	}
+	return b
 }
