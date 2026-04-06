@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"context"
 	"fmt"
 	"io"
 	"net/http"
@@ -235,7 +236,7 @@ func (h *DesktopHandler) UploadFinalize(c *gin.Context) {
 	}
 
 	
-	files, _ := h.db.ListFilesByAPIKey(c.Request.Context(), key.ID, 1, 0)
+	files, _ := h.db.ListFilesByAPIKey(context.Background(), key.ID, 50, 0)
 	var meta *models.DesktopFileMetadata
 	for i := range files {
 		if files[i].ID == baseResp.FileID {
@@ -246,14 +247,20 @@ func (h *DesktopHandler) UploadFinalize(c *gin.Context) {
 
 	if meta != nil {
 		h.hub.notify(key.ID, meta.FileName, meta)
+		c.JSON(http.StatusOK, models.DesktopFinalizeResponse{
+			FileID:      baseResp.FileID,
+			NumericCode: baseResp.NumericCode,
+			FileName:    meta.FileName,
+			FileSize:    meta.FileSize,
+			ExpiresAt:   meta.ExpiresAt,
+			ShareURL:    baseResp.ShareURL,
+		})
+		return
 	}
 
 	c.JSON(http.StatusOK, models.DesktopFinalizeResponse{
 		FileID:      baseResp.FileID,
 		NumericCode: baseResp.NumericCode,
-		FileName:    meta.FileName,
-		FileSize:    meta.FileSize,
-		ExpiresAt:   meta.ExpiresAt,
 		ShareURL:    baseResp.ShareURL,
 	})
 }
