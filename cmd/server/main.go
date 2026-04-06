@@ -65,10 +65,6 @@ func main() {
 	router := gin.New()
 	router.Use(gin.Recovery())
 	router.Use(gin.Logger())
-	router.HandleMethodNotAllowed = true
-	router.OPTIONS("/*path", func(c *gin.Context) {
-		c.Status(204)
-	})
 
 	router.Use(func(c *gin.Context) {
 		c.Header("Connection", "keep-alive")
@@ -113,7 +109,6 @@ func main() {
 	api := router.Group("/api")
 	api.Use(middleware.CSRFMiddleware())
 	{
-
 		upload := api.Group("/upload")
 		{
 			upload.POST("/init", rateLimiter.Handler(), uploadHandler.Init)
@@ -131,48 +126,52 @@ func main() {
 			file.GET("/code/:code", downloadHandler.GetByCode)
 			file.POST("/:id/report", reportHandler.Report)
 		}
+	}
 
-			desktopCORS := func(c *gin.Context) {
-				c.Header("Access-Control-Allow-Origin", "*")
-				c.Header("Access-Control-Allow-Methods", "GET, POST, DELETE, OPTIONS")
-				c.Header("Access-Control-Allow-Headers", "Content-Type, X-API-KEY")
-				if c.Request.Method == "OPTIONS" {
-					c.AbortWithStatus(204)
-					return
-				}
-				c.Next()
-			}
-		
-			router.OPTIONS("/desktop/*path", func(c *gin.Context) {
-				c.Header("Access-Control-Allow-Origin", "*")
-				c.Header("Access-Control-Allow-Methods", "GET, POST, DELETE, OPTIONS")
-				c.Header("Access-Control-Allow-Headers", "Content-Type, X-API-KEY")
-				c.Status(204)
-			})
+	desktopCORS := func(c *gin.Context) {
+		c.Header("Access-Control-Allow-Origin", "*")
+		c.Header("Access-Control-Allow-Methods", "GET, POST, DELETE, OPTIONS")
+		c.Header("Access-Control-Allow-Headers", "Content-Type, X-API-KEY")
+		if c.Request.Method == "OPTIONS" {
+			c.AbortWithStatus(204)
+			return
+		}
+		c.Next()
+	}
 
-		desktop := router.Group("/desktop")
-		desktop.Use(desktopCORS)
+	router.OPTIONS("/desktop/auth/verify", desktopCORS)
+	router.OPTIONS("/desktop/upload/init", desktopCORS)
+	router.OPTIONS("/desktop/upload/chunk", desktopCORS)
+	router.OPTIONS("/desktop/upload/complete", desktopCORS)
+	router.OPTIONS("/desktop/upload/finalize", desktopCORS)
+	router.OPTIONS("/desktop/upload/status/:session_id", desktopCORS)
+	router.OPTIONS("/desktop/files", desktopCORS)
+	router.OPTIONS("/desktop/files/:id", desktopCORS)
+	router.OPTIONS("/desktop/files/:id/download", desktopCORS)
+
+	desktop := router.Group("/desktop")
+	desktop.Use(desktopCORS)
+	{
+		desktop.GET("/auth/verify", desktopHandler.VerifyKey)
+		desktop.GET("/ws", desktopHandler.WebSocket)
+
+		desktopAuth := desktop.Group("")
+		desktopAuth.Use(middleware.DesktopAuthMiddleware(db))
 		{
-			desktop.GET("/auth/verify", desktopHandler.VerifyKey)
-			desktop.GET("/ws", desktopHandler.WebSocket)
-			desktopAuth := desktop.Group("")
-			desktopAuth.Use(middleware.DesktopAuthMiddleware(db))
+			upload := desktopAuth.Group("/upload")
 			{
-				upload := desktopAuth.Group("/upload")
-				{
-					upload.POST("/init",           desktopHandler.UploadInit)
-					upload.POST("/chunk",          desktopHandler.UploadChunk)
-					upload.POST("/complete",       desktopHandler.UploadComplete)
-					upload.POST("/finalize",       desktopHandler.UploadFinalize)
-					upload.GET("/status/:session_id", desktopHandler.UploadStatus)
-				}
-	
-				files := desktopAuth.Group("/files")
-				{
-					files.GET("",           desktopHandler.ListFiles)
-					files.GET("/:id",      desktopHandler.GetFile)
-					files.GET("/:id/download", desktopHandler.DownloadFile)
-				}
+				upload.POST("/init", desktopHandler.UploadInit)
+				upload.POST("/chunk", desktopHandler.UploadChunk)
+				upload.POST("/complete", desktopHandler.UploadComplete)
+				upload.POST("/finalize", desktopHandler.UploadFinalize)
+				upload.GET("/status/:session_id", desktopHandler.UploadStatus)
+			}
+
+			files := desktopAuth.Group("/files")
+			{
+				files.GET("", desktopHandler.ListFiles)
+				files.GET("/:id", desktopHandler.GetFile)
+				files.GET("/:id/download", desktopHandler.DownloadFile)
 			}
 		}
 	}
