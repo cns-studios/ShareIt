@@ -1,0 +1,780 @@
+# ShareIt
+
+## Overview
+
+ShareIt is an end-to-end encrypted file sharing application that allows users to securely upload, share, and download files with automatic expiration. The platform offers both a web interface and a desktop application API for seamless file management.
+
+### Key Features
+
+- **End-to-End Encryption**: Files are encrypted on the client side before transmission
+- **Automatic Expiration**: Files automatically expire after a configurable duration (24 hours, 7 days, 30 days, or 90 days)
+- **Desktop Application Support**: Native desktop integration with API key authentication
+- **File Sharing**: Generate shareable links with numeric codes for easy file distribution
+- **Reporting System**: Users can report inappropriate files with automatic deletion after threshold
+- **Real-time Updates**: WebSocket support for desktop clients to receive notifications about new uploads
+- **Rate Limiting**: Request throttling to prevent abuse
+- **CSRF Protection**: Security middleware for web API endpoints
+
+## Getting Started
+
+### Prerequisites
+
+- Go 1.18+
+- PostgreSQL 12+
+- Redis 6+
+- Docker & Docker Compose (for containerized deployment)
+
+### Installation & Running
+
+```bash
+# Clone the repository
+git clone https://github.com/cns-studios/ShareIt.git
+cd ShareIt
+
+# Install dependencies
+go mod download
+
+# Set up environment variables
+cp .env.example .env
+
+# Run with Docker Compose
+docker compose up
+
+# Or run locally
+go run cmd/server/main.go
+```
+
+### Configuration
+
+Configure via environment variables:
+
+```env
+PORT=8085
+BASE_URL=http://localhost:8085
+
+# PostgreSQL
+POSTGRES_HOST=localhost
+POSTGRES_PORT=5432
+POSTGRES_USER=shareit
+POSTGRES_PASSWORD=changeme
+POSTGRES_DB=shareit
+
+# Redis
+REDIS_HOST=localhost
+REDIS_PORT=6379
+
+# Storage
+DATA_DIR=./data
+CHUNK_DIR=             # Optional: separate chunk storage directory
+
+# Security
+BEHIND_CLOUDFLARE=false
+MAX_FILE_SIZE=786432000  # 750MB in bytes
+AUTO_DELETE_REPORT_COUNT=3
+
+# Notifications
+DISCORD_WEBHOOK_URL=   # Optional: for file report notifications
+```
+
+---
+
+# API Documentation
+
+## Base URLs
+
+- **Web API**: `http://localhost:8085/api`
+- **Desktop API**: `http://localhost:8085/desktop`
+- **Web Pages**: `http://localhost:8085`
+
+## Authentication
+
+### Web API (Browser)
+
+The web API uses **CSRF token** authentication. Tokens are set as cookies automatically on page loads.
+
+- CSRF tokens are required for all `/api/*` endpoints
+- Token is transmitted in the `X-CSRF-Token` header
+- Obtained automatically when accessing any page (`/`, `/shared`, etc.)
+
+### Desktop API
+
+The desktop API uses **API Key** authentication.
+
+- Pass API key via `X-API-KEY` header
+- Verify key validity first with `/desktop/auth/verify`
+- CORS enabled for cross-origin requests
+
+## Error Response Format
+
+All error responses follow this format:
+
+```json
+{
+  "error": "Human-readable error message",
+  "code": "ERROR_CODE",
+  "details": "Additional context (optional)"
+}
+```
+
+Common error codes:
+- `INVALID_REQUEST` - Request body validation failed
+- `INVALID_FILE_ID` - File ID format is invalid
+- `FILE_NOT_FOUND` - File does not exist
+- `FILE_EXPIRED` - File has expired
+- `FILE_DELETED` - File was deleted due to reports
+- `FILE_TOO_LARGE` - File exceeds max size
+- `SESSION_NOT_FOUND` - Upload session doesn't exist
+- `API_KEY_NOT_FOUND` - Desktop API key invalid or inactive
+- `FILE_NOT_OWNED` - Desktop user doesn't own this file
+
+---
+
+## Web API Routes
+
+### Page Routes (Browser)
+
+#### `GET /` - Home Page
+Returns the main upload interface with CSRF token.
+
+**Response**: HTML page with form and base configuration
+
+**Query Parameters**: None
+
+---
+
+#### `GET /tos` - Terms of Service
+Returns the Terms of Service page.
+
+**Response**: HTML page
+
+---
+
+#### `GET /privacy` - Privacy Policy
+Returns the Privacy Policy page.
+
+**Response**: HTML page
+
+---
+
+#### `GET /shared` - File Lookup
+Returns the file lookup interface for retrieving files by numeric code.
+
+**Response**: HTML page with lookup form
+
+---
+
+#### `GET /shared/:id` - Download File Page
+Returns the download interface for a specific file.
+
+**Parameters**:
+- `id` (path, required) - File ID (UUID format)
+
+**Response**: HTML page with download interface
+
+---
+
+#### `GET /health` - Health Check
+Check if the server is running and healthy.
+
+**Response**:
+```json
+{
+  "status": "healthy"
+}
+```
+
+---
+
+### Upload API Routes
+
+#### `POST /api/upload/init` - Initialize Upload
+Initiates a new file upload session. Client specifies file details and chunk configuration.
+
+**Headers**:
+- `Content-Type: application/json`
+- `X-CSRF-Token: <token>` (required)
+
+**Request Body**:
+```json
+{
+  "file_name": "document.pdf",
+  "file_size": 5242880,
+  "total_chunks": 10,
+  "chunk_size": 524288
+}
+```
+
+**Parameters**:
+- `file_name` (string, required) - Original filename
+- `file_size` (integer, required) - Total file size in bytes
+- `total_chunks` (integer, required) - Number of chunks file is split into
+- `chunk_size` (integer, required) - Size of each chunk in bytes
+
+**Rate Limited**: Yes (one request per IP every 60 seconds)
+
+**Response** (200 OK):
+```json
+{
+  "session_id": "550e8400-e29b-41d4-a716-446655440000",
+  "file_id": "f8f8f8f8-f8f8-f8f8-f8f8-f8f8f8f8f8f8",
+  "chunk_size": 524288,
+  "total_chunks": 10
+}
+```
+
+---
+
+#### `POST /api/upload/chunk` - Upload Chunk
+Uploads a single chunk of the file.
+
+**Headers**:
+- `Content-Type: multipart/form-data`
+- `X-CSRF-Token: <token>` (required)
+
+**Form Parameters**:
+- `session_id` (string, required) - Session ID from init response
+- `chunk_index` (integer, required) - Zero-based chunk index
+- `file` (file, required) - Binary chunk data
+
+**Response** (200 OK):
+```json
+{
+  "chunk_index": 0,
+  "received": true
+}
+```
+
+---
+
+#### `GET /api/upload/status/:session_id` - Check Assembly Status
+Check if all chunks have been received and file assembly progress.
+
+**Parameters**:
+- `session_id` (path, required) - Session ID from init response
+
+**Response** (200 OK):
+```json
+{
+  "session_id": "550e8400-e29b-41d4-a716-446655440000",
+  "received_chunks": 8,
+  "total_chunks": 10,
+  "status": "assembling"
+}
+```
+
+---
+
+#### `POST /api/upload/complete` - Complete Upload
+Completes the upload after all chunks are sent. File is assembled and marked as pending.
+
+**Headers**:
+- `Content-Type: application/json`
+- `X-CSRF-Token: <token>` (required)
+
+**Request Body**:
+```json
+{
+  "session_id": "550e8400-e29b-41d4-a716-446655440000",
+  "confirmed": true
+}
+```
+
+**Parameters**:
+- `session_id` (string, required) - Session ID
+- `confirmed` (boolean, required) - Confirmation flag
+
+**Response** (200 OK):
+```json
+{
+  "session_id": "550e8400-e29b-41d4-a716-446655440000",
+  "file_id": "f8f8f8f8-f8f8-f8f8-f8f8-f8f8f8f8f8f8",
+  "pending_expires_at": "2026-04-07T12:34:56Z"
+}
+```
+
+---
+
+#### `POST /api/upload/finalize` - Finalize Upload
+Finalizes the upload and sets the expiration time. Generates a shareable link.
+
+**Headers**:
+- `Content-Type: application/json`
+- `X-CSRF-Token: <token>` (required)
+
+**Request Body**:
+```json
+{
+  "session_id": "550e8400-e29b-41d4-a716-446655440000",
+  "duration": "7d"
+}
+```
+
+**Parameters**:
+- `session_id` (string, required) - Session ID
+- `duration` (string, required) - Expiration duration: `24h`, `7d`, `30d`, or `90d`
+
+**Response** (200 OK):
+```json
+{
+  "file_id": "f8f8f8f8-f8f8-f8f8-f8f8-f8f8f8f8f8f8",
+  "numeric_code": "123-456-789",
+  "share_url": "http://localhost:8085/shared/f8f8f8f8-f8f8-f8f8-f8f8-f8f8f8f8f8f8"
+}
+```
+
+---
+
+#### `DELETE /api/upload/cancel` - Cancel Upload
+Cancels an ongoing upload session and cleans up temporary data.
+
+**Headers**:
+- `Content-Type: application/json`
+- `X-CSRF-Token: <token>` (required)
+
+**Request Body**:
+```json
+{
+  "session_id": "550e8400-e29b-41d4-a716-446655440000"
+}
+```
+
+**Response** (200 OK):
+```json
+{
+  "success": true,
+  "message": "Upload session cancelled"
+}
+```
+
+---
+
+### File API Routes
+
+#### `GET /api/file/:id` - Get File Metadata
+Retrieves metadata for a file without downloading it.
+
+**Parameters**:
+- `id` (path, required) - File ID (UUID format)
+
+**Response** (200 OK):
+```json
+{
+  "id": "f8f8f8f8-f8f8-f8f8-f8f8-f8f8f8f8f8f8",
+  "numeric_code": "123-456-789",
+  "original_name": "document.pdf",
+  "size_bytes": 5242880,
+  "expires_at": "2026-04-13T12:34:56Z",
+  "created_at": "2026-04-06T12:34:56Z"
+}
+```
+
+---
+
+#### `GET /api/file/:id/download` - Download File
+Downloads the file binary data.
+
+**Parameters**:
+- `id` (path, required) - File ID (UUID format)
+
+**Response** (200 OK):
+- Binary file content
+- `Content-Disposition` header with filename
+- `Content-Type` set to application/octet-stream
+
+**Status Codes**:
+- `200` - File downloaded successfully
+- `404` - File not found
+- `410` - File expired or deleted
+
+---
+
+#### `GET /api/file/code/:code` - Get File by Numeric Code
+Retrieves file metadata using the shareable numeric code instead of UUID.
+
+**Parameters**:
+- `code` (path, required) - Numeric code (format: `123-456-789`)
+
+**Response** (200 OK):
+```json
+{
+  "id": "f8f8f8f8-f8f8-f8f8-f8f8-f8f8f8f8f8f8",
+  "numeric_code": "123-456-789",
+  "original_name": "document.pdf",
+  "size_bytes": 5242880,
+  "expires_at": "2026-04-13T12:34:56Z",
+  "created_at": "2026-04-06T12:34:56Z"
+}
+```
+
+---
+
+#### `POST /api/file/:id/report` - Report File
+Reports a file for inappropriate content. File is automatically deleted after reaching report threshold.
+
+**Parameters**:
+- `id` (path, required) - File ID (UUID format)
+
+**Headers**:
+- `Content-Type: application/json`
+- `X-CSRF-Token: <token>` (required)
+
+**Response** (200 OK):
+```json
+{
+  "success": true,
+  "message": "File reported successfully"
+}
+```
+
+**Status Codes**:
+- `200` - Report submitted
+- `409` - User has already reported this file
+- `404` - File not found
+- `410` - File already expired or deleted
+
+---
+
+## Desktop API Routes
+
+All desktop routes require:
+- **CORS Headers** enabled for cross-origin requests
+- **API Key Authentication** via `X-API-KEY` header
+
+### Desktop Authentication
+
+#### `GET /desktop/auth/verify` - Verify API Key
+Validates an API key without requiring authentication. Used for initial key verification.
+
+**Query Parameters**:
+- `key` (string, required) - API key to verify
+
+**Response** (200 OK):
+```json
+{
+  "status": "valid",
+  "owner": "My Desktop"
+}
+```
+
+**Status Codes**:
+- `200` - Key is valid
+- `401` - Key is invalid or inactive
+
+---
+
+#### `GET /desktop/ws` - WebSocket Connection
+Establishes a WebSocket connection for real-time notifications about new file uploads.
+
+**Headers**:
+- `X-API-KEY: <api_key>` (required)
+
+**Authentication**: Desktop API Key authentication required
+
+**Message Format** (incoming):
+```json
+{
+  "type": "new_file",
+  "file": {
+    "id": "f8f8f8f8-f8f8-f8f8-f8f8-f8f8f8f8f8f8",
+    "numeric_code": "123-456-789",
+    "file_name": "document.pdf",
+    "file_size": 5242880,
+    "expires_at": "2026-04-13T12:34:56Z",
+    "uploaded_at": "2026-04-06T12:34:56Z"
+  }
+}
+```
+
+---
+
+### Desktop Upload Routes
+
+#### `POST /desktop/upload/init` - Initialize Desktop Upload
+Initiates an upload session from a desktop client.
+
+**Headers**:
+- `Content-Type: application/json`
+- `X-API-KEY: <api_key>` (required)
+
+**Request Body**:
+```json
+{
+  "file_name": "document.pdf",
+  "file_size": 5242880,
+  "total_chunks": 10,
+  "chunk_size": 524288
+}
+```
+
+**Response** (200 OK):
+```json
+{
+  "session_id": "550e8400-e29b-41d4-a716-446655440000",
+  "file_id": "f8f8f8f8-f8f8-f8f8-f8f8-f8f8f8f8f8f8",
+  "chunk_size": 524288,
+  "total_chunks": 10,
+  "api_key_id": "key-id-123"
+}
+```
+
+---
+
+#### `POST /desktop/upload/chunk` - Upload Desktop Chunk
+Uploads a file chunk from desktop client.
+
+**Headers**:
+- `Content-Type: multipart/form-data`
+- `X-API-KEY: <api_key>` (required)
+
+**Form Parameters**:
+- `session_id` (string, required) - Session ID
+- `chunk_index` (integer, required) - Zero-based index
+- `file` (file, required) - Binary chunk data
+
+**Response** (200 OK):
+```json
+{
+  "chunk_index": 0,
+  "received": true
+}
+```
+
+---
+
+#### `POST /desktop/upload/complete` - Complete Desktop Upload
+Marks all chunks as received.
+
+**Headers**:
+- `Content-Type: application/json`
+- `X-API-KEY: <api_key>` (required)
+
+**Request Body**:
+```json
+{
+  "session_id": "550e8400-e29b-41d4-a716-446655440000",
+  "confirmed": true
+}
+```
+
+**Response** (200 OK):
+```json
+{
+  "session_id": "550e8400-e29b-41d4-a716-446655440000",
+  "file_id": "f8f8f8f8-f8f8-f8f8-f8f8-f8f8f8f8f8f8",
+  "pending_expires_at": "2026-04-07T12:34:56Z"
+}
+```
+
+---
+
+#### `POST /desktop/upload/finalize` - Finalize Desktop Upload
+Sets expiration and generates share link for desktop uploads.
+
+**Headers**:
+- `Content-Type: application/json`
+- `X-API-KEY: <api_key>` (required)
+
+**Request Body**:
+```json
+{
+  "session_id": "550e8400-e29b-41d4-a716-446655440000",
+  "duration": "7d"
+}
+```
+
+**Response** (200 OK):
+```json
+{
+  "file_id": "f8f8f8f8-f8f8-f8f8-f8f8-f8f8f8f8f8f8",
+  "numeric_code": "123-456-789",
+  "file_name": "document.pdf",
+  "file_size": 5242880,
+  "expires_at": "2026-04-13T12:34:56Z",
+  "share_url": "http://localhost:8085/shared/f8f8f8f8-f8f8-f8f8-f8f8-f8f8f8f8f8f8"
+}
+```
+
+---
+
+#### `GET /desktop/upload/status/:session_id` - Check Upload Status
+Checks the assembly progress of desktop uploads.
+
+**Parameters**:
+- `session_id` (path, required) - Session ID
+
+**Headers**:
+- `X-API-KEY: <api_key>` (required)
+
+**Response** (200 OK):
+```json
+{
+  "session_id": "550e8400-e29b-41d4-a716-446655440000",
+  "received_chunks": 8,
+  "total_chunks": 10,
+  "status": "assembling"
+}
+```
+
+---
+
+### Desktop File Management Routes
+
+#### `GET /desktop/files` - List Files for API Key
+Lists all files uploaded by this API key.
+
+**Headers**:
+- `X-API-KEY: <api_key>` (required)
+
+**Query Parameters** (optional):
+- `limit` (integer) - Max results (default: 50)
+- `offset` (integer) - Pagination offset (default: 0)
+
+**Response** (200 OK):
+```json
+{
+  "files": [
+    {
+      "id": "f8f8f8f8-f8f8-f8f8-f8f8-f8f8f8f8f8f8",
+      "numeric_code": "123-456-789",
+      "file_name": "document.pdf",
+      "file_size": 5242880,
+      "expires_at": "2026-04-13T12:34:56Z",
+      "uploaded_at": "2026-04-06T12:34:56Z"
+    }
+  ],
+  "total": 5
+}
+```
+
+---
+
+#### `GET /desktop/files/:id` - Get File Details
+Retrieves metadata for a specific file owned by this API key.
+
+**Parameters**:
+- `id` (path, required) - File ID
+
+**Headers**:
+- `X-API-KEY: <api_key>` (required)
+
+**Response** (200 OK):
+```json
+{
+  "id": "f8f8f8f8-f8f8-f8f8-f8f8-f8f8f8f8f8f8",
+  "numeric_code": "123-456-789",
+  "file_name": "document.pdf",
+  "file_size": 5242880,
+  "expires_at": "2026-04-13T12:34:56Z",
+  "uploaded_at": "2026-04-06T12:34:56Z"
+}
+```
+
+**Status Codes**:
+- `200` - File found
+- `404` - File not found or doesn't belong to API key
+- `410` - File expired or deleted
+
+---
+
+#### `GET /desktop/files/:id/download` - Download File
+Downloads a file owned by this API key.
+
+**Parameters**:
+- `id` (path, required) - File ID
+
+**Headers**:
+- `X-API-KEY: <api_key>` (required)
+
+**Response** (200 OK):
+- Binary file content
+- `Content-Disposition` header with filename
+
+**Status Codes**:
+- `200` - File downloaded
+- `404` - File not found
+- `410` - File expired or deleted
+
+---
+
+## Rate Limiting
+
+- **Web Upload Init**: Limited to 1 request per IP per 60 seconds
+- **Desktop API**: No per-endpoint rate limiting (but IP-based overall limits may apply)
+- Rate limit info returned in response headers (if applicable)
+
+## Security Considerations
+
+1. **CSRF Protection**: All web API endpoints require CSRF tokens
+2. **Encryption**: Files are encrypted client-side before upload
+3. **API Keys**: Desktop API keys should be treated as secrets
+4. **IP Tracking**: All uploads are tracked by IP for security and reporting
+5. **File Expiration**: Files are automatically deleted after expiration
+6. **Report System**: Files can be reported and auto-deleted after threshold
+
+## Pagination & Filtering
+
+The `/desktop/files` endpoint supports pagination:
+
+```
+GET /desktop/files?limit=20&offset=40
+```
+
+- `limit`: 1-100 (default 50)
+- `offset`: 0+ (default 0)
+
+---
+
+## Example Usage
+
+### Web Upload Flow
+
+```bash
+# 1. Initialize upload
+curl -X POST http://localhost:8085/api/upload/init \
+  -H "Content-Type: application/json" \
+  -H "X-CSRF-Token: <token>" \
+  -d '{"file_name":"test.pdf","file_size":1000,"total_chunks":1,"chunk_size":1000}'
+
+# 2. Upload chunk
+curl -X POST http://localhost:8085/api/upload/chunk \
+  -H "X-CSRF-Token: <token>" \
+  -F "session_id=<session_id>" \
+  -F "chunk_index=0" \
+  -F "file=@test.pdf"
+
+# 3. Complete upload
+curl -X POST http://localhost:8085/api/upload/complete \
+  -H "Content-Type: application/json" \
+  -H "X-CSRF-Token: <token>" \
+  -d '{"session_id":"<session_id>","confirmed":true}'
+
+# 4. Finalize with expiration
+curl -X POST http://localhost:8085/api/upload/finalize \
+  -H "Content-Type: application/json" \
+  -H "X-CSRF-Token: <token>" \
+  -d '{"session_id":"<session_id>","duration":"7d"}'
+```
+
+### Desktop Upload Flow
+
+```bash
+# 1. Verify API key
+curl -X GET "http://localhost:8085/desktop/auth/verify?key=<api_key>"
+
+# 2. Initialize upload
+curl -X POST http://localhost:8085/desktop/upload/init \
+  -H "Content-Type: application/json" \
+  -H "X-API-KEY: <api_key>" \
+  -d '{"file_name":"test.pdf","file_size":1000,"total_chunks":1,"chunk_size":1000}'
+
+# 3. Upload chunk
+curl -X POST http://localhost:8085/desktop/upload/chunk \
+  -H "X-API-KEY: <api_key>" \
+  -F "session_id=<session_id>" \
+  -F "chunk_index=0" \
+  -F "file=@test.pdf"
+
+# 4. Complete and finalize (same as web)
+```
+
+---
