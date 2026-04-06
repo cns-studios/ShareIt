@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"shareit/internal/config"
+	"shareit/internal/models"
 	"shareit/internal/services"
 	"shareit/internal/storage"
 )
