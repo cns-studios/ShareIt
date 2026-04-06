@@ -77,8 +77,10 @@ func main() {
 
 	ipMiddleware := middleware.NewIPMiddleware(cfg)
 	rateLimiter := middleware.NewRateLimiter(rdb)
+	cnsAuth := middleware.CNSAuthMiddleware(cfg)
 
 	router.Use(ipMiddleware.Handler())
+	router.Use(cnsAuth)
 
 	pageHandler := handlers.NewPageHandler(cfg)
 	uploadHandler := handlers.NewUploadHandler(cfg, db, rdb, fs, uploadService)
@@ -109,6 +111,8 @@ func main() {
 	api := router.Group("/api")
 	api.Use(middleware.CSRFMiddleware())
 	{
+		api.GET("/limits", pageHandler.Limits)
+		
 		upload := api.Group("/upload")
 		{
 			upload.POST("/init", rateLimiter.Handler(), uploadHandler.Init)

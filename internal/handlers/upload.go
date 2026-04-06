@@ -50,8 +50,9 @@ func (h *UploadHandler) Init(c *gin.Context) {
 	}
 
 	 
-	if req.FileSize > h.cfg.MaxFileSize {
-		c.JSON(http.StatusBadRequest, models.ErrorResponse{
+	tier := middleware.GetTier(h.cfg, middleware.GetCNSUser(c))
+	if req.FileSize > tier.MaxFileSize {
+			c.JSON(http.StatusBadRequest, models.ErrorResponse{
 			Error: models.ErrFileTooLarge.Message,
 			Code:  models.ErrFileTooLarge.Code,
 		})
@@ -120,6 +121,15 @@ func (h *UploadHandler) Finalize(c *gin.Context) {
 			Error:   "Invalid request body",
 			Code:    "INVALID_REQUEST",
 			Details: err.Error(),
+		})
+		return
+	}
+
+	tier := middleware.GetTier(h.cfg, middleware.GetCNSUser(c))
+	if !tier.IsDurationAllowed(req.Duration) {
+		c.JSON(http.StatusBadRequest, models.ErrorResponse{
+			Error: "Duration not available for your account tier",
+			Code:  "DURATION_NOT_ALLOWED",
 		})
 		return
 	}

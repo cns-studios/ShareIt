@@ -1254,3 +1254,11 @@ main:has(.legal-document) {
         height: 4rem;
     }
 }
+
+.duration-locked {
+    opacity: 0.45;
+    cursor: default;
+}
+.duration-locked input {
+    pointer-events: none;
+}

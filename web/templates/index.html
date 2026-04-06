@@ -10,6 +10,10 @@
     <link rel="alternate icon" href="/static/favicon.svg">
 </head>
 <body>
+    <div id="auth-nudge" class="hidden" style="background:#111;border-bottom:1px solid #2a2a2a;padding:0.6rem 1.5rem;display:flex;align-items:center;justify-content:center;gap:1rem;font-size:0.85rem;color:#888;">
+        <span><a href="{{.authLoginURL}}" style="color:var(--accent);text-decoration:none;">Log in</a> to unlock 1.5 GB uploads and 30/90 day retention.</span>
+    </div>
+    
     <div id="error-banner" class="error-banner hidden">
         <div class="error-banner-content">
             <span id="error-banner-text" class="error-banner-text"></span>
@@ -123,7 +127,7 @@
 
                         <div class="form-group">
                             <label class="form-label">Expiration</label>
-                            <div class="expiration-options">
+                            <div class="expiration-options" id="expiration-options">
                                 <label class="duration-option">
                                     <input type="radio" name="expiration" value="24h" checked>
                                     <span>24 hours</span>
@@ -132,13 +136,13 @@
                                     <input type="radio" name="expiration" value="7d">
                                     <span>7 days</span>
                                 </label>
-                                <label class="duration-option">
-                                    <input type="radio" name="expiration" value="30d">
-                                    <span>30 days</span>
+                                <label class="duration-option duration-locked" id="opt-30d">
+                                    <input type="radio" name="expiration" value="30d" disabled>
+                                    <span>30 days <span class="lock-hint">— <a href="{{.authLoginURL}}" style="color:var(--accent);text-decoration:none;">log in</a></span></span>
                                 </label>
-                                <label class="duration-option">
-                                    <input type="radio" name="expiration" value="90d">
-                                    <span>3 months</span>
+                                <label class="duration-option duration-locked" id="opt-90d">
+                                    <input type="radio" name="expiration" value="90d" disabled>
+                                    <span>3 months <span class="lock-hint">— <a href="{{.authLoginURL}}" style="color:var(--accent);text-decoration:none;">log in</a></span></span>
                                 </label>
                             </div>
                         </div>
@@ -229,7 +233,10 @@
     <script>
         window.CONFIG = {
             baseURL: "{{.baseURL}}",
-            maxFileSize: {{.maxFileSize}}
+            maxFileSize: {{.maxFileSize}},
+            authMaxFileSize: {{.authMaxFileSize}},
+            authenticated: {{.authenticated}},
+            allowedDurations: {{.allowedDurations}}
         };
     </script>
     <script src="https://unpkg.com/lucide@latest"></script>

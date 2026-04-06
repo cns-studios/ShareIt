@@ -3,8 +3,9 @@
 
      
     const CHUNK_SIZE = 5 * 1024 * 1024;  
-    const MAX_FILE_SIZE = window.CONFIG?.maxFileSize || 786432000;  
-    const PARALLEL_CHUNK_UPLOADS = window.CONFIG?.parallelChunkUploads || 6;
+    const MAX_FILE_SIZE = window.CONFIG?.maxFileSize || 786432000;
+    const AUTHENTICATED = window.CONFIG?.authenticated || false;
+    const ALLOWED_DURATIONS = window.CONFIG?.allowedDurations || ['24h', '7d'];    const PARALLEL_CHUNK_UPLOADS = window.CONFIG?.parallelChunkUploads || 6;
     const MAX_CHUNK_UPLOAD_RETRIES = 5;
 
     let totalChunks = 0;
@@ -71,7 +72,31 @@
             console.error('Failed to preload word list:', error);
         }
 
+        applyTierUI();
         setupEventListeners();
+    }
+
+    function applyTierUI() {
+        if (!AUTHENTICATED) {
+            const nudge = document.getElementById('auth-nudge');
+            if (nudge) nudge.classList.remove('hidden');
+        }
+
+        document.querySelectorAll('input[name="expiration"]').forEach(input => {
+            const allowed = ALLOWED_DURATIONS.includes(input.value);
+            input.disabled = !allowed;
+            const label = input.closest('.duration-option');
+            if (label) {
+                if (allowed) {
+                    label.classList.remove('duration-locked');
+                    const hint = label.querySelector('.lock-hint');
+                    if (hint) hint.style.display = 'none';
+                }
+            }
+        });
+
+        const firstAllowed = document.querySelector('input[name="expiration"]:not([disabled])');
+        if (firstAllowed) firstAllowed.checked = true;
     }
 
     function setupEventListeners() {

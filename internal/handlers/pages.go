@@ -6,6 +6,7 @@ import (
 	"net/http"
 
 	"shareit/internal/config"
+	"shareit/internal/middleware"
 
 	"github.com/gin-gonic/gin"
 )
@@ -32,10 +33,21 @@ func setCSRFTokenCookie(c *gin.Context) {
 
 func (h *PageHandler) Index(c *gin.Context) {
 	setCSRFTokenCookie(c)
+	user := middleware.GetCNSUser(c)
+	tier := middleware.GetTier(h.cfg, user)
+	authenticated := user != nil
+	authLoginURL := ""
+	if h.cfg.CNSAuthURL != "" {
+		authLoginURL = h.cfg.CNSAuthURL + "/login?redirect_uri=" + h.cfg.BaseURL
+	}
 	c.HTML(http.StatusOK, "index.html", gin.H{
 		"title":       "ShareIt - End-to-End Encrypted File Sharing",
 		"baseURL":     h.cfg.BaseURL,
-		"maxFileSize": h.cfg.MaxFileSize,
+		"maxFileSize": tier.MaxFileSize,
+		"authMaxFileSize": h.cfg.AuthMaxFileSize,
+		"authenticated": authenticated,
+		"allowedDurations": tier.AllowedDurations,
+		"authLoginURL": authLoginURL,
 	})
 }
 
@@ -71,5 +83,14 @@ func (h *PageHandler) SharedFile(c *gin.Context) {
 		"title":   "Download File - ShareIt",
 		"baseURL": h.cfg.BaseURL,
 		"fileID":  fileID,
+	})
+}
+
+func (h *PageHandler) Limits(c *gin.Context) {
+	tier := middleware.GetTier(h.cfg, middleware.GetCNSUser(c))
+	c.JSON(http.StatusOK, gin.H{
+		"max_file_size":      tier.MaxFileSize,
+		"allowed_durations":  tier.AllowedDurations,
+		"authenticated":      middleware.GetCNSUser(c) != nil,
 	})
 }
