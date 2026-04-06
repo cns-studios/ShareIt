@@ -1,0 +1,8 @@
+services:
+  app:
+    volumes:
+      - /mnt/shareit:/data
+volumes:
+  postgres_data:
+  redis_data:
+  chunk_data:
