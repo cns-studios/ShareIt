@@ -65,6 +65,10 @@ func main() {
 	router := gin.New()
 	router.Use(gin.Recovery())
 	router.Use(gin.Logger())
+	router.HandleMethodNotAllowed = true
+	router.OPTIONS("/*path", func(c *gin.Context) {
+		c.Status(204)
+	})
 
 	router.Use(func(c *gin.Context) {
 		c.Header("Connection", "keep-alive")
@@ -128,22 +132,26 @@ func main() {
 			file.POST("/:id/report", reportHandler.Report)
 		}
 
+			desktopCORS := func(c *gin.Context) {
+				c.Header("Access-Control-Allow-Origin", "*")
+				c.Header("Access-Control-Allow-Methods", "GET, POST, DELETE, OPTIONS")
+				c.Header("Access-Control-Allow-Headers", "Content-Type, X-API-KEY")
+				if c.Request.Method == "OPTIONS" {
+					c.AbortWithStatus(204)
+					return
+				}
+				c.Next()
+			}
+		
+			router.OPTIONS("/desktop/*path", func(c *gin.Context) {
+				c.Header("Access-Control-Allow-Origin", "*")
+				c.Header("Access-Control-Allow-Methods", "GET, POST, DELETE, OPTIONS")
+				c.Header("Access-Control-Allow-Headers", "Content-Type, X-API-KEY")
+				c.Status(204)
+			})
+
 		desktop := router.Group("/desktop")
-		desktop.Use(func(c *gin.Context) {
-			origin := c.GetHeader("Origin")
-			if origin == "" {
-				origin = "*"
-			}
-			c.Header("Access-Control-Allow-Origin", origin)
-			c.Header("Access-Control-Allow-Credentials", "true")
-			c.Header("Access-Control-Allow-Methods", "GET, POST, DELETE, OPTIONS")
-			c.Header("Access-Control-Allow-Headers", "Content-Type, X-API-KEY")
-			if c.Request.Method == "OPTIONS" {
-				c.AbortWithStatus(204)
-				return
-			}
-			c.Next()
-		})
+		desktop.Use(desktopCORS)
 		{
 			desktop.GET("/auth/verify", desktopHandler.VerifyKey)
 			desktop.GET("/ws", desktopHandler.WebSocket)
