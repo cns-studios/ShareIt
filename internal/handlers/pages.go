@@ -2,7 +2,9 @@ package handlers
 
 import (
 	"crypto/rand"
+	"encoding/json"
 	"encoding/hex"
+	"html/template"
 	"net/http"
 
 	"shareit/internal/config"
@@ -40,6 +42,17 @@ func (h *PageHandler) Index(c *gin.Context) {
 	if h.cfg.CNSAuthURL != "" {
 		authLoginURL = h.cfg.CNSAuthURL + "/login?redirect_uri=" + h.cfg.BaseURL
 	}
+	configData := map[string]interface{}{
+		"baseURL":         h.cfg.BaseURL,
+		"maxFileSize":     tier.MaxFileSize,
+		"authMaxFileSize": h.cfg.AuthMaxFileSize,
+		"authenticated":   authenticated,
+		"allowedDurations": tier.AllowedDurations,
+	}
+	configJSON, err := json.Marshal(configData)
+	if err != nil {
+		configJSON = []byte("{}")
+	}
 	c.HTML(http.StatusOK, "index.html", gin.H{
 		"title":       "ShareIt - End-to-End Encrypted File Sharing",
 		"baseURL":     h.cfg.BaseURL,
@@ -48,6 +61,7 @@ func (h *PageHandler) Index(c *gin.Context) {
 		"authenticated": authenticated,
 		"allowedDurations": tier.AllowedDurations,
 		"authLoginURL": authLoginURL,
+		"configJSON":  template.JS(string(configJSON)),
 	})
 }
 

@@ -1,4 +1,6 @@
 
+@import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;500;700&family=Instrument+Serif&family=JetBrains+Mono&family=Press+Start+2P&display=swap');
+
 .share-banner {
     position: fixed;
     top: 0;
@@ -51,8 +53,6 @@
 .share-banner-close:hover {
     opacity: 1;
 }
-@import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;500;700&family=Instrument+Serif&family=JetBrains+Mono&display=swap');
-
  
 *, *::before, *::after {
     box-sizing: border-box;
@@ -74,6 +74,12 @@
     --color-success: #4caf50;
     --color-error: #f44336;
     --color-warning: #ff9800;
+    
+    --cns-magenta: #FF00FF;
+    --cns-red: #FF3131;
+    --cns-orange: #FF8C00;
+    --cns-gold: #FFD700;
+    --cns-cyan: #00F5FF;
 }
 
 
@@ -1206,6 +1212,44 @@ main:has(.legal-document) {
 @keyframes fadeOut {
     from { opacity: 1; }
     to { opacity: 0; }
+}
+
+@property --cns-angle {
+    syntax: '<angle>';
+    inherits: false;
+    initial-value: 0deg;
+}
+
+@keyframes cnsBorderFlow {
+    from { --cns-angle: 0deg; }
+    to { --cns-angle: 360deg; }
+}
+
+.btn-cns-login {
+    border: 2px solid var(--border);
+    background-color: var(--surface);
+    font-family: 'Press Start 2P', monospace;
+    font-size: x-small;
+    transition: color 0.3s ease, background-color 0.3s ease, box-shadow 0.3s ease, border-color 0.3s ease;
+}
+
+.btn.btn-secondary.btn-cns-login:hover:not(:disabled),
+.btn.btn-secondary.btn-cns-login:focus-visible {
+    --cns-angle: 0deg;
+    border-color: transparent;
+    color: var(--color-text);
+    background:
+        linear-gradient(var(--border), var(--border)) padding-box,
+        conic-gradient(
+            from var(--cns-angle),
+            var(--cns-magenta),
+            var(--cns-red),
+            var(--cns-orange),
+            var(--cns-gold),
+            var(--cns-cyan),
+            var(--cns-magenta)
+        ) border-box;
+    animation: cnsBorderFlow 1s linear infinite;
 }
 
  

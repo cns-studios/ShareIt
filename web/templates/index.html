@@ -25,9 +25,14 @@
 
     <div class="container">
         <header>
-            <div class="space-y-1">
-                <h1>ShareIt</h1>
-                <p class="subtitle">End-to-End Encrypted File Sharing</p>
+            <div style="display: flex; align-items: center; justify-content: space-between; width: 100%; gap: 2rem;">
+                <div class="space-y-1">
+                    <h1>ShareIt</h1>
+                    <p class="subtitle">End-to-End Encrypted File Sharing</p>
+                </div>
+                <a href="{{.authLoginURL}}" class="btn btn-secondary btn-cns-login" style="white-space: nowrap; margin-left: auto;">
+                    Login with CNS
+                </a>
             </div>
         </header>
 
@@ -45,7 +50,7 @@
                 
                 <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 2rem; max-width: 700px; color: #555; font-size: 0.9rem;">
                     <div style="border-top: 1px solid #333; padding-top: 1.5rem;">
-                        <span class="mono" style="font-size: 0.625rem; color: var(--accent); text-transform: uppercase;">01 // LIMITS</span>
+                        <span class="mono" style="font-size: 0.625rem; color: var(--accent); text-transform: uppercase;">01 // FREEDOM</span>
                         <p style="margin-top: 1rem; line-height: 1.6;">
                             Upload what you need, when you need it. ShareIt is built for quick, secure transfers without unnecessary friction, so you can send important files fast and keep full control over your data from start to finish.
                         </p>
@@ -54,6 +59,12 @@
                         <span class="mono" style="font-size: 0.625rem; color: var(--accent); text-transform: uppercase;">02 // ACCESS</span>
                         <p style="margin-top: 1rem; line-height: 1.6;">
                             Retrieve shared files quickly from any modern browser using a simple lookup flow or direct link. ShareIt is designed for smooth access with minimal steps, so recipients can open what they need without creating accounts, installing extra software, or navigating unnecessary complexity.
+                        </p>
+                    </div>
+                    <div style="border-top: 1px solid #333; padding-top: 1.5rem;">
+                        <span class="mono" style="font-size: 0.625rem; color: var(--accent); text-transform: uppercase;">03 // LIMITS</span>
+                        <p style="margin-top: 1rem; line-height: 1.6;">
+                            Upload up to 750 MB as a guest with maximum 7-day file expiry, or up to 1.5 GB with extended retention options up to 90 days when logged into a CNS account.
                         </p>
                     </div>
                 </div>
@@ -231,13 +242,7 @@
     </div>
 
     <script>
-        window.CONFIG = {
-            baseURL: "{{.baseURL}}",
-            maxFileSize: {{.maxFileSize}},
-            authMaxFileSize: {{.authMaxFileSize}},
-            authenticated: {{.authenticated}},
-            allowedDurations: {{.allowedDurations}}
-        };
+        window.CONFIG = {{.configJSON}};
     </script>
     <script src="https://unpkg.com/lucide@latest"></script>
     <script>

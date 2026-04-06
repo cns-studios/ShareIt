@@ -3,8 +3,8 @@
 
      
     const CHUNK_SIZE = 5 * 1024 * 1024;  
-    const MAX_FILE_SIZE = window.CONFIG?.maxFileSize || 786432000;
     const AUTHENTICATED = window.CONFIG?.authenticated || false;
+    const MAX_FILE_SIZE = AUTHENTICATED ? (1.5 * 1024 * 1024 * 1024) : 786432000;
     const ALLOWED_DURATIONS = window.CONFIG?.allowedDurations || ['24h', '7d'];    const PARALLEL_CHUNK_UPLOADS = window.CONFIG?.parallelChunkUploads || 6;
     const MAX_CHUNK_UPLOAD_RETRIES = 5;
 
