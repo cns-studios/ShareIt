@@ -4,6 +4,7 @@ import (
 	"crypto/rand"
 	"crypto/sha256"
 	"encoding/base64"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -28,16 +29,18 @@ func (h *AuthHandler) Login(c *gin.Context) {
 		return
 	}
 
-	state := generateRandomString(32)
-	verifier := generateRandomString(64)
+	// Use Hex for state and verifier to avoid any Base64 encoding/decoding issues in URLs or cookies
+	state := generateRandomHex(16)    // 32 chars
+	verifier := generateRandomHex(32) // 64 chars
 	challenge := generateChallenge(verifier)
 
+	isSecure := strings.HasPrefix(h.cfg.BaseURL, "https")
+
 	// Store verifier and state in cookies (short-lived)
-	// Using "" (empty string) creates a Host-Only cookie for shareit.cns-studios.com
-	// This prevents the "leading dot" issue which causes browsers to drop cookies during redirects.
+	// We use empty domain string to set a Host-Only cookie for the current host.
 	c.SetSameSite(http.SameSiteLaxMode)
-	c.SetCookie("pkce_verifier", verifier, 600, "/", "", h.cfg.IsProd(), true)
-	c.SetCookie("pkce_state", state, 600, "/", "", h.cfg.IsProd(), true)
+	c.SetCookie("pkce_verifier", verifier, 600, "/", "", isSecure, true)
+	c.SetCookie("pkce_state", state, 600, "/", "", isSecure, true)
 
 	authURL := h.cfg.CNSAuthURL + "/login"
 	redirectURI := h.cfg.BaseURL + "/auth/callback"
@@ -60,24 +63,26 @@ func (h *AuthHandler) Callback(c *gin.Context) {
 
 	savedState, err := c.Cookie("pkce_state")
 	if err != nil {
-		c.String(http.StatusBadRequest, "Invalid state: missing pkce_state cookie from browser")
+		c.String(http.StatusBadRequest, "Invalid state: missing pkce_state cookie. (Error: %v)", err)
 		return
 	}
 	if savedState != state {
-		fmt.Printf("State Mismatch: saved=%s, got=%s\n", savedState, state)
-		c.String(http.StatusBadRequest, "Invalid state: mismatch between cookie and URL")
+		fmt.Printf("State Mismatch: saved_cookie=%s, got_url=%s\n", savedState, state)
+		c.String(http.StatusBadRequest, "Invalid state: mismatch. Cookie had '%s' but URL had '%s'.", savedState, state)
 		return
 	}
 
 	verifier, err := c.Cookie("pkce_verifier")
 	if err != nil {
-		c.String(http.StatusBadRequest, "Missing verifier cookie")
+		c.String(http.StatusBadRequest, "Missing verifier cookie. Your session may have expired.")
 		return
 	}
 
+	isSecure := strings.HasPrefix(h.cfg.BaseURL, "https")
+
 	// Clear PKCE cookies
-	c.SetCookie("pkce_verifier", "", -1, "/", "", h.cfg.IsProd(), true)
-	c.SetCookie("pkce_state", "", -1, "/", "", h.cfg.IsProd(), true)
+	c.SetCookie("pkce_verifier", "", -1, "/", "", isSecure, true)
+	c.SetCookie("pkce_state", "", -1, "/", "", isSecure, true)
 
 	// Exchange code for tokens
 	tokenURL := h.cfg.CNSAuthURL + "/v2/token"
@@ -93,7 +98,7 @@ func (h *AuthHandler) Callback(c *gin.Context) {
 	body, _ := json.Marshal(payload)
 	resp, err := http.Post(tokenURL, "application/json", strings.NewReader(string(body)))
 	if err != nil {
-		c.String(http.StatusInternalServerError, "Failed to exchange code: %v", err)
+		c.String(http.StatusInternalServerError, "Failed to connect to auth server: %v", err)
 		return
 	}
 	defer resp.Body.Close()
@@ -113,22 +118,23 @@ func (h *AuthHandler) Callback(c *gin.Context) {
 
 	// Set auth_token as a host-only cookie
 	c.SetSameSite(http.SameSiteLaxMode)
-	c.SetCookie("auth_token", result.AccessToken, 3600*24*7, "/", "", h.cfg.IsProd(), true)
+	c.SetCookie("auth_token", result.AccessToken, 3600*24*7, "/", "", isSecure, true)
 
 	c.Redirect(http.StatusFound, "/")
 }
 
 func (h *AuthHandler) Logout(c *gin.Context) {
-	c.SetCookie("auth_token", "", -1, "/", "", h.cfg.IsProd(), true)
+	isSecure := strings.HasPrefix(h.cfg.BaseURL, "https")
+	c.SetCookie("auth_token", "", -1, "/", "", isSecure, true)
 	c.Redirect(http.StatusFound, "/")
 }
 
-func generateRandomString(n int) string {
+func generateRandomHex(n int) string {
 	b := make([]byte, n)
 	if _, err := rand.Read(b); err != nil {
 		panic(err)
 	}
-	return base64.RawURLEncoding.EncodeToString(b)
+	return hex.EncodeToString(b)
 }
 
 func generateChallenge(verifier string) string {
