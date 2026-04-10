@@ -6,6 +6,7 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"net/http"
+	"net/url"
 	"shareit/internal/config"
 	"strings"
 
@@ -37,16 +38,16 @@ func (h *AuthHandler) Login(c *gin.Context) {
 	authURL := h.cfg.CNSAuthURL + "/login"
 	redirectURI := h.cfg.BaseURL + "/auth/callback"
 
-	q := []string{
-		"client_id=" + h.cfg.CNSAuthClientID,
-		"redirect_uri=" + redirectURI,
-		"response_type=code",
-		"code_challenge=" + challenge,
-		"code_challenge_method=S256",
-		"state=" + state,
-	}
+	val := url.Values{}
+	val.Add("client_id", h.cfg.CNSAuthClientID)
+	val.Add("redirect_uri", redirectURI)
+	val.Add("response_type", "code")
+	val.Add("code_challenge", challenge)
+	val.Add("code_challenge_method", "S256")
+	val.Add("state", state)
+	val.Add("scope", "openid profile")
 
-	c.Redirect(http.StatusFound, authURL+"?"+strings.Join(q, "&"))
+	c.Redirect(http.StatusFound, authURL+"?"+val.Encode())
 }
 
 func (h *AuthHandler) Callback(c *gin.Context) {

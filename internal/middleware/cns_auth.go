@@ -42,6 +42,7 @@ func CNSAuthMiddleware(cfg *config.Config) gin.HandlerFunc {
 			return
 		}
 		req.Header.Set("x-service-key", cfg.CNSAuthServiceKey)
+		req.Header.Set("Authorization", "Bearer "+authToken)
 		req.Header.Set("Cookie", "auth_token="+authToken)
 
 		resp, err := http.DefaultClient.Do(req)
