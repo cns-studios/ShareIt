@@ -2,6 +2,7 @@ package config
 
 import (
 	"fmt"
+	"net/url"
 	"os"
 	"strconv"
 	"strings"
@@ -108,6 +109,14 @@ func (c *Config) PostgresDSN() string {
 
 func (c *Config) RedisAddr() string {
 	return fmt.Sprintf("%s:%s", c.RedisHost, c.RedisPort)
+}
+
+func (c *Config) Hostname() string {
+	u, err := url.Parse(c.BaseURL)
+	if err != nil {
+		return ""
+	}
+	return u.Hostname()
 }
 
 func (c *Config) IsProd() bool {

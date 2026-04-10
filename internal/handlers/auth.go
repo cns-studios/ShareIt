@@ -5,6 +5,7 @@ import (
 	"crypto/sha256"
 	"encoding/base64"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"net/url"
 	"shareit/internal/config"
@@ -32,8 +33,10 @@ func (h *AuthHandler) Login(c *gin.Context) {
 	challenge := generateChallenge(verifier)
 
 	// Store verifier and state in cookies (short-lived)
-	c.SetCookie("pkce_verifier", verifier, 600, "/", "", h.cfg.IsProd(), true)
-	c.SetCookie("pkce_state", state, 600, "/", "", h.cfg.IsProd(), true)
+	hostname := h.cfg.Hostname()
+	c.SetSameSite(http.SameSiteLaxMode)
+	c.SetCookie("pkce_verifier", verifier, 600, "/", hostname, h.cfg.IsProd(), true)
+	c.SetCookie("pkce_state", state, 600, "/", hostname, h.cfg.IsProd(), true)
 
 	authURL := h.cfg.CNSAuthURL + "/login"
 	redirectURI := h.cfg.BaseURL + "/auth/callback"
@@ -56,6 +59,7 @@ func (h *AuthHandler) Callback(c *gin.Context) {
 
 	savedState, err := c.Cookie("pkce_state")
 	if err != nil || savedState != state {
+		fmt.Printf("State Mismatch: saved=%s, got=%s, err=%v\n", savedState, state, err)
 		c.String(http.StatusBadRequest, "Invalid state")
 		return
 	}
@@ -67,8 +71,9 @@ func (h *AuthHandler) Callback(c *gin.Context) {
 	}
 
 	// Clear PKCE cookies
-	c.SetCookie("pkce_verifier", "", -1, "/", "", h.cfg.IsProd(), true)
-	c.SetCookie("pkce_state", "", -1, "/", "", h.cfg.IsProd(), true)
+	hostname := h.cfg.Hostname()
+	c.SetCookie("pkce_verifier", "", -1, "/", hostname, h.cfg.IsProd(), true)
+	c.SetCookie("pkce_state", "", -1, "/", hostname, h.cfg.IsProd(), true)
 
 	// Exchange code for tokens
 	tokenURL := h.cfg.CNSAuthURL + "/v2/token"
@@ -103,13 +108,15 @@ func (h *AuthHandler) Callback(c *gin.Context) {
 	}
 
 	// Set auth_token cookie
-	c.SetCookie("auth_token", result.AccessToken, 3600*24*7, "/", "", h.cfg.IsProd(), true)
+	c.SetSameSite(http.SameSiteLaxMode)
+	c.SetCookie("auth_token", result.AccessToken, 3600*24*7, "/", hostname, h.cfg.IsProd(), true)
 
 	c.Redirect(http.StatusFound, "/")
 }
 
 func (h *AuthHandler) Logout(c *gin.Context) {
-	c.SetCookie("auth_token", "", -1, "/", "", h.cfg.IsProd(), true)
+	hostname := h.cfg.Hostname()
+	c.SetCookie("auth_token", "", -1, "/", hostname, h.cfg.IsProd(), true)
 	c.Redirect(http.StatusFound, "/")
 }
 
