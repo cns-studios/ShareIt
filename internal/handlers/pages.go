@@ -44,7 +44,7 @@ func (h *PageHandler) Index(c *gin.Context) {
 	}
 	authLoginURL := ""
 	if h.cfg.CNSAuthURL != "" {
-		authLoginURL = h.cfg.CNSAuthURL + "/login?redirect_uri=" + h.cfg.BaseURL
+		authLoginURL = "/auth/login"
 	}
 	configData := map[string]interface{}{
 		"baseURL":         h.cfg.BaseURL,

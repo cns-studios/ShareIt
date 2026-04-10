@@ -83,6 +83,7 @@ func main() {
 	router.Use(cnsAuth)
 
 	pageHandler := handlers.NewPageHandler(cfg)
+	authHandler := handlers.NewAuthHandler(cfg)
 	uploadHandler := handlers.NewUploadHandler(cfg, db, rdb, fs, uploadService)
 	downloadHandler := handlers.NewDownloadHandler(cfg, db, fs)
 	reportHandler := handlers.NewReportHandler(cfg, db, discord)
@@ -107,6 +108,13 @@ func main() {
 	router.GET("/privacy", pageHandler.Privacy)
 	router.GET("/shared", pageHandler.SharedLookup)
 	router.GET("/shared/:id", pageHandler.SharedFile)
+
+	auth := router.Group("/auth")
+	{
+		auth.GET("/login", authHandler.Login)
+		auth.GET("/callback", authHandler.Callback)
+		auth.GET("/logout", authHandler.Logout)
+	}
 
 	api := router.Group("/api")
 	api.Use(middleware.CSRFMiddleware())

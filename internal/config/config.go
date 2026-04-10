@@ -40,6 +40,7 @@ type Config struct {
 	DiscordWebhookURL string
 
 	CNSAuthURL        string
+	CNSAuthClientID   string
 	CNSAuthServiceKey string
 	AuthMaxFileSize   int64
 }
@@ -65,6 +66,7 @@ func Load() (*Config, error) {
 		AutoDeleteReportCount: getEnvInt("AUTO_DELETE_REPORT_COUNT", 3),
 		DiscordWebhookURL:     getEnv("DISCORD_WEBHOOK_URL", ""),
 		CNSAuthURL:            getEnv("CNS_AUTH_URL", ""),
+		CNSAuthClientID:       getEnv("CNS_AUTH_CLIENT_ID", ""),
 		CNSAuthServiceKey:     getEnv("CNS_AUTH_SERVICE_KEY", ""),
 		AuthMaxFileSize:       getEnvInt64("AUTH_MAX_FILE_SIZE", 1610612736), // 1.5 GB
 	}
