@@ -33,10 +33,11 @@ func (h *AuthHandler) Login(c *gin.Context) {
 	challenge := generateChallenge(verifier)
 
 	// Store verifier and state in cookies (short-lived)
-	hostname := h.cfg.Hostname()
+	// Using "" (empty string) creates a Host-Only cookie for shareit.cns-studios.com
+	// This prevents the "leading dot" issue which causes browsers to drop cookies during redirects.
 	c.SetSameSite(http.SameSiteLaxMode)
-	c.SetCookie("pkce_verifier", verifier, 600, "/", hostname, h.cfg.IsProd(), true)
-	c.SetCookie("pkce_state", state, 600, "/", hostname, h.cfg.IsProd(), true)
+	c.SetCookie("pkce_verifier", verifier, 600, "/", "", h.cfg.IsProd(), true)
+	c.SetCookie("pkce_state", state, 600, "/", "", h.cfg.IsProd(), true)
 
 	authURL := h.cfg.CNSAuthURL + "/login"
 	redirectURI := h.cfg.BaseURL + "/auth/callback"
@@ -58,22 +59,25 @@ func (h *AuthHandler) Callback(c *gin.Context) {
 	state := c.Query("state")
 
 	savedState, err := c.Cookie("pkce_state")
-	if err != nil || savedState != state {
-		fmt.Printf("State Mismatch: saved=%s, got=%s, err=%v\n", savedState, state, err)
-		c.String(http.StatusBadRequest, "Invalid state")
+	if err != nil {
+		c.String(http.StatusBadRequest, "Invalid state: missing pkce_state cookie from browser")
+		return
+	}
+	if savedState != state {
+		fmt.Printf("State Mismatch: saved=%s, got=%s\n", savedState, state)
+		c.String(http.StatusBadRequest, "Invalid state: mismatch between cookie and URL")
 		return
 	}
 
 	verifier, err := c.Cookie("pkce_verifier")
 	if err != nil {
-		c.String(http.StatusBadRequest, "Missing verifier")
+		c.String(http.StatusBadRequest, "Missing verifier cookie")
 		return
 	}
 
 	// Clear PKCE cookies
-	hostname := h.cfg.Hostname()
-	c.SetCookie("pkce_verifier", "", -1, "/", hostname, h.cfg.IsProd(), true)
-	c.SetCookie("pkce_state", "", -1, "/", hostname, h.cfg.IsProd(), true)
+	c.SetCookie("pkce_verifier", "", -1, "/", "", h.cfg.IsProd(), true)
+	c.SetCookie("pkce_state", "", -1, "/", "", h.cfg.IsProd(), true)
 
 	// Exchange code for tokens
 	tokenURL := h.cfg.CNSAuthURL + "/v2/token"
@@ -89,13 +93,13 @@ func (h *AuthHandler) Callback(c *gin.Context) {
 	body, _ := json.Marshal(payload)
 	resp, err := http.Post(tokenURL, "application/json", strings.NewReader(string(body)))
 	if err != nil {
-		c.String(http.StatusInternalServerError, "Failed to exchange code")
+		c.String(http.StatusInternalServerError, "Failed to exchange code: %v", err)
 		return
 	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
-		c.String(http.StatusInternalServerError, "Token exchange failed")
+		c.String(http.StatusInternalServerError, "Token exchange failed: %s", resp.Status)
 		return
 	}
 
@@ -103,20 +107,19 @@ func (h *AuthHandler) Callback(c *gin.Context) {
 		AccessToken string `json:"access_token"`
 	}
 	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
-		c.String(http.StatusInternalServerError, "Failed to decode token response")
+		c.String(http.StatusInternalServerError, "Failed to parse token response")
 		return
 	}
 
-	// Set auth_token cookie
+	// Set auth_token as a host-only cookie
 	c.SetSameSite(http.SameSiteLaxMode)
-	c.SetCookie("auth_token", result.AccessToken, 3600*24*7, "/", hostname, h.cfg.IsProd(), true)
+	c.SetCookie("auth_token", result.AccessToken, 3600*24*7, "/", "", h.cfg.IsProd(), true)
 
 	c.Redirect(http.StatusFound, "/")
 }
 
 func (h *AuthHandler) Logout(c *gin.Context) {
-	hostname := h.cfg.Hostname()
-	c.SetCookie("auth_token", "", -1, "/", hostname, h.cfg.IsProd(), true)
+	c.SetCookie("auth_token", "", -1, "/", "", h.cfg.IsProd(), true)
 	c.Redirect(http.StatusFound, "/")
 }
 
