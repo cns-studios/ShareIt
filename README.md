@@ -74,6 +74,23 @@ AUTO_DELETE_REPORT_COUNT=3
 
 # Notifications
 DISCORD_WEBHOOK_URL=   # Optional: for file report notifications
+
+# Migrations
+MIGRATIONS_DIR=db/migrations
+```
+
+### Database Migrations
+
+ShareIt now applies SQL migrations automatically at server startup.
+
+- Migration files are loaded from `MIGRATIONS_DIR` (default: `db/migrations`).
+- Applied migrations are tracked in `schema_migrations`.
+- If a previously-applied migration file changes, startup fails with a checksum mismatch.
+
+To run migrations manually:
+
+```bash
+make migrate
 ```
 
 ---
