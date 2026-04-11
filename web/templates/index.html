@@ -32,7 +32,7 @@
                 </div>
                 {{if .authenticated}}
                 <a href="#" class="btn btn-secondary btn-cns-login" style="white-space: nowrap; margin-left: auto;" onclick="return false;" aria-disabled="true">
-                    Logged in as: {{.username}}
+                    Logged in as {{.username}}
                 </a>
                 {{else}}
                 <a href="{{.authLoginURL}}" class="btn btn-secondary btn-cns-login" style="white-space: nowrap; margin-left: auto;">

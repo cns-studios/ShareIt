@@ -1226,7 +1226,7 @@ main:has(.legal-document) {
 }
 
 .btn-cns-login {
-    border: 2px solid var(--border);
+    border: 3px solid var(--border);
     background-color: var(--surface);
     font-family: 'Press Start 2P', monospace;
     font-size: x-small;
