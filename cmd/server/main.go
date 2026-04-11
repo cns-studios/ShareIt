@@ -158,6 +158,7 @@ func main() {
 				devices.POST("/enrollments", rateLimiter.Handler(), recentUploadsHandler.CreateEnrollment)
 				devices.GET("/enrollments/pending", recentUploadsHandler.ListPendingEnrollments)
 				devices.POST("/enrollments/:id/approve", rateLimiter.Handler(), recentUploadsHandler.ApproveEnrollment)
+				devices.POST("/enrollments/:id/reject", rateLimiter.Handler(), recentUploadsHandler.RejectEnrollment)
 			}
 		}
 	}

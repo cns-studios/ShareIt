@@ -65,6 +65,17 @@
     const recentEmpty = document.getElementById('recent-empty');
     const recentList = document.getElementById('recent-list');
     const recentCount = document.getElementById('recent-count');
+    const deviceApprovalBanner = document.getElementById('device-approval-banner');
+    const deviceApprovalTitle = document.getElementById('device-approval-title');
+    const deviceApprovalMessage = document.getElementById('device-approval-message');
+    const deviceApprovalMeta = document.getElementById('device-approval-meta');
+    const deviceApprovalCount = document.getElementById('device-approval-count');
+    const deviceApprovalDecline = document.getElementById('device-approval-decline');
+    const deviceApprovalApprove = document.getElementById('device-approval-approve');
+
+    let pendingEnrollmentItems = [];
+    let activePendingEnrollment = null;
+    let pendingEnrollmentBusy = false;
 
     function getCookieValue(name) {
         const value = `; ${document.cookie}`;
@@ -89,6 +100,7 @@
         if (AUTHENTICATED) {
             await ensureDeviceReady();
             await loadRecentUploads();
+            await loadPendingEnrollments();
         }
     }
 
@@ -181,6 +193,179 @@
         } catch (error) {
             console.error(error);
             setRecentState('error');
+        }
+    }
+
+    async function loadPendingEnrollments() {
+        if (!AUTHENTICATED || !deviceApprovalBanner) return;
+
+        try {
+            const response = await fetch('/api/me/devices/enrollments/pending', {
+                headers: { 'X-CSRF-Token': getCookieValue('csrf_token') }
+            });
+
+            if (!response.ok) {
+                throw new Error('Failed to load pending device approvals');
+            }
+
+            const payload = await response.json();
+            pendingEnrollmentItems = Array.isArray(payload.items) ? payload.items : [];
+
+            if (pendingEnrollmentItems.length > 0) {
+                setActivePendingEnrollment(pendingEnrollmentItems[0], pendingEnrollmentItems.length);
+                showPendingEnrollmentBanner();
+            } else {
+                activePendingEnrollment = null;
+                hidePendingEnrollmentBanner();
+            }
+        } catch (error) {
+            console.error('Failed to load pending enrollments:', error);
+            pendingEnrollmentItems = [];
+            activePendingEnrollment = null;
+            hidePendingEnrollmentBanner();
+        }
+    }
+
+    function setActivePendingEnrollment(item, count) {
+        activePendingEnrollment = item;
+        if (!deviceApprovalTitle || !deviceApprovalMessage || !deviceApprovalMeta) {
+            return;
+        }
+
+        const device = item?.request_device || {};
+        const enrollment = item?.enrollment || {};
+        const deviceName = device.device_label || device.id || 'Unknown device';
+        const deviceId = device.id || enrollment.request_device_id || 'unknown';
+        const keyAlgorithm = device.key_algorithm || 'unknown';
+        const requestedAt = enrollment.created_at ? formatUploadDate(enrollment.created_at) : 'just now';
+
+        deviceApprovalTitle.textContent = 'New device wants access';
+        deviceApprovalMessage.textContent = 'A new device from your CNS account wants to view your files. If you did not ask for this, decline and change your CNS password.';
+        deviceApprovalMeta.innerHTML = [
+            `<span>Device: ${escapeHtml(deviceName)}</span>`,
+            `<span>Device ID: ${escapeHtml(deviceId)}</span>`,
+            `<span>Key: ${escapeHtml(keyAlgorithm)}</span>`,
+            `<span>Requested: ${escapeHtml(requestedAt)}</span>`
+        ].join('');
+
+        if (deviceApprovalCount) {
+            deviceApprovalCount.textContent = count > 1 ? `${count} pending` : '1 pending';
+        }
+    }
+
+    function showPendingEnrollmentBanner() {
+        if (!deviceApprovalBanner || !activePendingEnrollment) return;
+        deviceApprovalBanner.classList.add('visible');
+        deviceApprovalBanner.setAttribute('aria-hidden', 'false');
+    }
+
+    function hidePendingEnrollmentBanner() {
+        if (!deviceApprovalBanner) return;
+        deviceApprovalBanner.classList.remove('visible');
+        deviceApprovalBanner.setAttribute('aria-hidden', 'true');
+    }
+
+    async function handleApprovePendingEnrollment() {
+        if (!activePendingEnrollment || pendingEnrollmentBusy) return;
+
+        pendingEnrollmentBusy = true;
+        deviceApprovalBanner?.classList.add('is-busy');
+        if (deviceApprovalApprove) deviceApprovalApprove.disabled = true;
+        if (deviceApprovalDecline) deviceApprovalDecline.disabled = true;
+
+        try {
+            if (!authDeviceIdentity) {
+                await ensureDeviceReady();
+            }
+            if (!authUserKeyRaw) {
+                authUserKeyRaw = SecureCrypto.getUserKeyRaw(CNS_USER_ID);
+            }
+            if (!authUserKeyRaw) {
+                throw new Error('Trusted user key is not available on this device');
+            }
+
+            const requestDevice = activePendingEnrollment.request_device || {};
+            const requestPublicKey = requestDevice.public_key_jwk;
+            if (!requestPublicKey) {
+                throw new Error('Request device public key is missing');
+            }
+
+            const wrappedUserKey = await SecureCrypto.wrapUserKeyForDevice(authUserKeyRaw, requestPublicKey);
+            const response = await fetch(`/api/me/devices/enrollments/${encodeURIComponent(activePendingEnrollment.enrollment.id)}/approve`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRF-Token': getCookieValue('csrf_token')
+                },
+                body: JSON.stringify({
+                    approver_device_id: authDeviceIdentity.deviceId,
+                    verification_code: activePendingEnrollment.enrollment.verification_code,
+                    wrapped_user_key_b64: SecureCrypto.toBase64(wrappedUserKey),
+                    uk_wrap_alg: 'RSA-OAEP-2048-v1',
+                    uk_wrap_meta: {
+                        type: 'enrollment-approval',
+                        approver_device_id: authDeviceIdentity.deviceId,
+                        request_device_id: requestDevice.id || activePendingEnrollment.enrollment.request_device_id
+                    }
+                })
+            });
+
+            if (!response.ok) {
+                const errorPayload = await response.json().catch(() => ({}));
+                throw new Error(errorPayload.error || 'Failed to approve device');
+            }
+
+            await loadPendingEnrollments();
+            await loadRecentUploads();
+        } catch (error) {
+            console.error('Approve enrollment failed:', error);
+            showErrorBanner('Approval failed: ' + error.message);
+        } finally {
+            pendingEnrollmentBusy = false;
+            if (deviceApprovalApprove) deviceApprovalApprove.disabled = false;
+            if (deviceApprovalDecline) deviceApprovalDecline.disabled = false;
+            deviceApprovalBanner?.classList.remove('is-busy');
+        }
+    }
+
+    async function handleDeclinePendingEnrollment() {
+        if (!activePendingEnrollment || pendingEnrollmentBusy) return;
+
+        pendingEnrollmentBusy = true;
+        deviceApprovalBanner?.classList.add('is-busy');
+        if (deviceApprovalApprove) deviceApprovalApprove.disabled = true;
+        if (deviceApprovalDecline) deviceApprovalDecline.disabled = true;
+
+        try {
+            if (!authDeviceIdentity) {
+                await ensureDeviceReady();
+            }
+
+            const response = await fetch(`/api/me/devices/enrollments/${encodeURIComponent(activePendingEnrollment.enrollment.id)}/reject`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRF-Token': getCookieValue('csrf_token')
+                },
+                body: JSON.stringify({
+                    approver_device_id: authDeviceIdentity.deviceId
+                })
+            });
+
+            if (!response.ok) {
+                const errorPayload = await response.json().catch(() => ({}));
+                throw new Error(errorPayload.error || 'Failed to decline device');
+            }
+
+            await loadPendingEnrollments();
+        } catch (error) {
+            console.error('Reject enrollment failed:', error);
+            showErrorBanner('Decline failed: ' + error.message);
+        } finally {
+            pendingEnrollmentBusy = false;
+            if (deviceApprovalApprove) deviceApprovalApprove.disabled = false;
+            if (deviceApprovalDecline) deviceApprovalDecline.disabled = false;
+            deviceApprovalBanner?.classList.remove('is-busy');
         }
     }
 
@@ -395,6 +580,9 @@
         if (errorBannerClose) {
             errorBannerClose.addEventListener('click', hideErrorBanner);
         }
+
+        deviceApprovalApprove?.addEventListener('click', handleApprovePendingEnrollment);
+        deviceApprovalDecline?.addEventListener('click', handleDeclinePendingEnrollment);
     }
 
     function handleDragOver(e) {

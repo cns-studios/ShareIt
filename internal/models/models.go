@@ -75,6 +75,15 @@ type DeviceEnrollment struct {
 	ApprovedAt         sql.NullTime   `db:"approved_at" json:"-"`
 }
 
+type PendingEnrollmentItem struct {
+	Enrollment    DeviceEnrollment `json:"enrollment"`
+	RequestDevice UserDevice       `json:"request_device"`
+}
+
+type PendingEnrollmentsResponse struct {
+	Items []PendingEnrollmentItem `json:"items"`
+}
+
 type FileMetadata struct {
 	ID           string    `json:"id"`
 	NumericCode  string    `json:"numeric_code"`
@@ -214,6 +223,10 @@ type ApproveEnrollmentRequest struct {
 	WrappedUserKeyB64 string          `json:"wrapped_user_key_b64" binding:"required"`
 	UKWrapAlg         string          `json:"uk_wrap_alg" binding:"required"`
 	UKWrapMeta        json.RawMessage `json:"uk_wrap_meta" binding:"required"`
+}
+
+type RejectEnrollmentRequest struct {
+	ApproverDeviceID string `json:"approver_device_id" binding:"required"`
 }
 
 const (

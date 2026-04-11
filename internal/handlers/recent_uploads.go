@@ -212,7 +212,29 @@ func (h *RecentUploadsHandler) ListPendingEnrollments(c *gin.Context) {
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{"items": items})
+	devices, err := h.db.GetActiveDevicesByUser(c.Request.Context(), int64(user.ID))
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, models.ErrorResponse{Error: "Failed to list devices", Code: "DEVICE_LIST_FAILED"})
+		return
+	}
+	deviceByID := make(map[string]models.UserDevice, len(devices))
+	for _, device := range devices {
+		deviceByID[device.ID] = device
+	}
+
+	respItems := make([]models.PendingEnrollmentItem, 0, len(items))
+	for _, item := range items {
+		device, ok := deviceByID[item.RequestDeviceID]
+		if !ok {
+			device = models.UserDevice{ID: item.RequestDeviceID}
+		}
+		respItems = append(respItems, models.PendingEnrollmentItem{
+			Enrollment:    item,
+			RequestDevice: device,
+		})
+	}
+
+	c.JSON(http.StatusOK, models.PendingEnrollmentsResponse{Items: respItems})
 }
 
 func (h *RecentUploadsHandler) ApproveEnrollment(c *gin.Context) {
@@ -286,6 +308,52 @@ func (h *RecentUploadsHandler) ApproveEnrollment(c *gin.Context) {
 
 	if err := h.db.ApproveEnrollment(c.Request.Context(), int64(user.ID), enrollmentID, req.ApproverDeviceID); err != nil {
 		c.JSON(http.StatusInternalServerError, models.ErrorResponse{Error: "Failed to approve enrollment", Code: "ENROLLMENT_APPROVE_FAILED"})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"success": true})
+}
+
+func (h *RecentUploadsHandler) RejectEnrollment(c *gin.Context) {
+	user := middleware.GetCNSUser(c)
+	if user == nil {
+		c.JSON(http.StatusUnauthorized, models.ErrorResponse{Error: "Authentication required", Code: "AUTH_REQUIRED"})
+		return
+	}
+
+	enrollmentID := c.Param("id")
+	if enrollmentID == "" {
+		c.JSON(http.StatusBadRequest, models.ErrorResponse{Error: "Missing enrollment id", Code: "INVALID_REQUEST"})
+		return
+	}
+
+	var req models.RejectEnrollmentRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, models.ErrorResponse{Error: "Invalid request body", Code: "INVALID_REQUEST", Details: err.Error()})
+		return
+	}
+
+	owned, err := h.userOwnsDevice(c.Request.Context(), int64(user.ID), req.ApproverDeviceID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, models.ErrorResponse{Error: "Failed to verify approver device", Code: "DEVICE_LOOKUP_FAILED"})
+		return
+	}
+	if !owned {
+		c.JSON(http.StatusForbidden, models.ErrorResponse{Error: "Approver device does not belong to user", Code: "DEVICE_NOT_AUTHORIZED"})
+		return
+	}
+
+	if _, err := h.db.GetUserKeyEnvelopeForDevice(c.Request.Context(), int64(user.ID), req.ApproverDeviceID); err != nil {
+		c.JSON(http.StatusForbidden, models.ErrorResponse{Error: "Approver device is not trusted", Code: "APPROVER_NOT_TRUSTED"})
+		return
+	}
+
+	if err := h.db.RejectEnrollment(c.Request.Context(), int64(user.ID), enrollmentID); err != nil {
+		if err == models.ErrUploadNotPending {
+			c.JSON(http.StatusBadRequest, models.ErrorResponse{Error: "Enrollment is no longer pending", Code: "ENROLLMENT_NOT_PENDING"})
+			return
+		}
+		c.JSON(http.StatusInternalServerError, models.ErrorResponse{Error: "Failed to reject enrollment", Code: "ENROLLMENT_REJECT_FAILED"})
 		return
 	}
 

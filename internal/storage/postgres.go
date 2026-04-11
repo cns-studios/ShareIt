@@ -533,6 +533,34 @@ func (p *Postgres) ApproveEnrollment(ctx context.Context, userID int64, enrollme
 	return nil
 }
 
+func (p *Postgres) RejectEnrollment(ctx context.Context, userID int64, enrollmentID string) error {
+	query := `
+		UPDATE device_enrollments
+		SET status = $1
+		WHERE id = $2
+		  AND cns_user_id = $3
+		  AND status = $4
+		  AND expires_at > NOW()
+	`
+	res, err := p.db.ExecContext(ctx, query,
+		models.EnrollmentStatusRejected,
+		enrollmentID,
+		userID,
+		models.EnrollmentStatusPending,
+	)
+	if err != nil {
+		return err
+	}
+	rows, err := res.RowsAffected()
+	if err != nil {
+		return err
+	}
+	if rows == 0 {
+		return models.ErrUploadNotPending
+	}
+	return nil
+}
+
 func (p *Postgres) TouchExpiredEnrollments(ctx context.Context, userID int64) error {
 	query := `
 		UPDATE device_enrollments
